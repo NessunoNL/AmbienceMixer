@@ -1,0 +1,183 @@
+import type { Scene } from "./types";
+import {
+  Castle,
+  Trees,
+  Mountain,
+  DoorOpen,
+  Skull,
+  Zap,
+  Ghost,
+  CloudLightning,
+  Flame,
+  CloudRain,
+  Wind,
+  Swords,
+} from "lucide-react";
+
+// Using free ambient sounds from various sources
+// These are placeholder URLs - you'll need to host your own audio files
+export const mockScenes: Scene[] = [
+  {
+    id: "dungeon",
+    label: "Dungeon • Drizzle • Tense",
+    icon: "Castle",
+    environment: {
+      id: "dungeon-env",
+      name: "Dungeon Ambience",
+      url: "https://assets.mixkit.co/active_storage/sfx/2486/2486-preview.mp3", // Placeholder
+      volume: 0.7,
+    },
+    weather: {
+      id: "drizzle",
+      name: "Light Rain",
+      url: "https://assets.mixkit.co/active_storage/sfx/2393/2393-preview.mp3", // Placeholder
+      volume: 0.5,
+    },
+    music: {
+      id: "tense-music",
+      name: "Tense Atmosphere",
+      url: "https://assets.mixkit.co/active_storage/sfx/2470/2470-preview.mp3", // Placeholder
+      volume: 0.6,
+    },
+    oneshots: [
+      {
+        id: "door-slam",
+        name: "Door Slam",
+        url: "https://assets.mixkit.co/active_storage/sfx/2046/2046-preview.mp3",
+        icon: "DoorOpen",
+      },
+      {
+        id: "ghoul-hiss",
+        name: "Ghoul Hiss",
+        url: "https://assets.mixkit.co/active_storage/sfx/1765/1765-preview.mp3",
+        icon: "Skull",
+      },
+      {
+        id: "stone-creak",
+        name: "Stone Creak",
+        url: "https://assets.mixkit.co/active_storage/sfx/2489/2489-preview.mp3",
+        icon: "Castle",
+      },
+      {
+        id: "echo-clap",
+        name: "Echo Clap",
+        url: "https://assets.mixkit.co/active_storage/sfx/1726/1726-preview.mp3",
+        icon: "Zap",
+      },
+    ],
+  },
+  {
+    id: "jungle",
+    label: "Jungle • Storm • Calm",
+    icon: "Trees",
+    environment: {
+      id: "jungle-env",
+      name: "Jungle Ambience",
+      url: "https://assets.mixkit.co/active_storage/sfx/2479/2479-preview.mp3",
+      volume: 0.7,
+    },
+    weather: {
+      id: "storm",
+      name: "Thunder Storm",
+      url: "https://assets.mixkit.co/active_storage/sfx/2392/2392-preview.mp3",
+      volume: 0.6,
+    },
+    music: {
+      id: "calm-music",
+      name: "Calm Atmosphere",
+      url: "https://assets.mixkit.co/active_storage/sfx/2458/2458-preview.mp3",
+      volume: 0.5,
+    },
+    oneshots: [
+      {
+        id: "flock-burst",
+        name: "Flock Burst",
+        url: "https://assets.mixkit.co/active_storage/sfx/1757/1757-preview.mp3",
+        icon: "Ghost",
+      },
+      {
+        id: "thunderclap",
+        name: "Thunderclap",
+        url: "https://assets.mixkit.co/active_storage/sfx/1745/1745-preview.mp3",
+        icon: "CloudLightning",
+      },
+      {
+        id: "distant-roar",
+        name: "Distant Roar",
+        url: "https://assets.mixkit.co/active_storage/sfx/1773/1773-preview.mp3",
+        icon: "Flame",
+      },
+      {
+        id: "rain-splash",
+        name: "Rain Splash",
+        url: "https://assets.mixkit.co/active_storage/sfx/2393/2393-preview.mp3",
+        icon: "CloudRain",
+      },
+    ],
+  },
+  {
+    id: "pass",
+    label: "High Pass • Wind • Epic",
+    icon: "Mountain",
+    environment: {
+      id: "mountain-env",
+      name: "Mountain Wind",
+      url: "https://assets.mixkit.co/active_storage/sfx/2486/2486-preview.mp3",
+      volume: 0.6,
+    },
+    weather: {
+      id: "wind",
+      name: "Strong Wind",
+      url: "https://assets.mixkit.co/active_storage/sfx/2390/2390-preview.mp3",
+      volume: 0.7,
+    },
+    music: {
+      id: "epic-music",
+      name: "Epic Atmosphere",
+      url: "https://assets.mixkit.co/active_storage/sfx/2462/2462-preview.mp3",
+      volume: 0.6,
+    },
+    oneshots: [
+      {
+        id: "avalanche",
+        name: "Avalanche Pebbles",
+        url: "https://assets.mixkit.co/active_storage/sfx/2489/2489-preview.mp3",
+        icon: "Mountain",
+      },
+      {
+        id: "wind-gust",
+        name: "Wind Gust",
+        url: "https://assets.mixkit.co/active_storage/sfx/2390/2390-preview.mp3",
+        icon: "Wind",
+      },
+      {
+        id: "eagle-cry",
+        name: "Eagle Cry",
+        url: "https://assets.mixkit.co/active_storage/sfx/1757/1757-preview.mp3",
+        icon: "Ghost",
+      },
+      {
+        id: "war-horn",
+        name: "War Horn",
+        url: "https://assets.mixkit.co/active_storage/sfx/1726/1726-preview.mp3",
+        icon: "Swords",
+      },
+    ],
+  },
+];
+
+// Icon map for string-to-component conversion
+export const iconMap: Record<string, any> = {
+  Castle,
+  Trees,
+  Mountain,
+  DoorOpen,
+  Skull,
+  Zap,
+  Ghost,
+  CloudLightning,
+  Flame,
+  CloudRain,
+  Wind,
+  Swords,
+};
