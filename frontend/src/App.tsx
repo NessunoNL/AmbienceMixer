@@ -1,17 +1,39 @@
 import { useState, useEffect, useRef } from "react";
-import { Music, CloudRain, Trees } from "lucide-react";
+import { Music, CloudRain, Trees, Settings2 } from "lucide-react";
 import { Section } from "./components/Section";
 import { SceneChip } from "./components/SceneChip";
 import { VerticalFader } from "./components/VerticalFader";
 import { LayerTile } from "./components/LayerTile";
 import { OneShotButton } from "./components/OneShotButton";
+import { LayerPicker } from "./components/LayerPicker";
+import { SceneManager } from "./components/SceneManager";
 import { AudioEngine } from "./audioEngine";
-import { mockScenes, iconMap } from "./mockData";
+import { mockScenes, iconMap, environmentLibrary, weatherLibrary, musicLibrary } from "./mockData";
 import { theme } from "./theme";
-import type { LayerType } from "./types";
+import type { LayerType, AudioLayer, Scene } from "./types";
 
 function App() {
-  const [sceneId, setSceneId] = useState(mockScenes[0].id);
+  // Scene management - load from localStorage or use defaults
+  const [scenes, setScenes] = useState<Scene[]>(() => {
+    const saved = localStorage.getItem("ambience-mixer-scenes");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved scenes:", e);
+        return mockScenes;
+      }
+    }
+    return mockScenes;
+  });
+
+  const [sceneId, setSceneId] = useState(() => {
+    const savedSceneId = localStorage.getItem("ambience-mixer-current-scene");
+    return savedSceneId || mockScenes[0].id;
+  });
+
+  const [sceneManagerOpen, setSceneManagerOpen] = useState(false);
+
   const [volumes, setVolumes] = useState({
     environment: 70,
     weather: 45,
@@ -23,16 +45,76 @@ function App() {
     music: false,
   });
   const [oneShotVolume, setOneShotVolume] = useState(80);
+  const [pickerOpen, setPickerOpen] = useState<LayerType | null>(null);
+
+  // Track current layer selections (independent of scenes) - load from localStorage
+  const [currentLayers, setCurrentLayers] = useState<{
+    environment?: AudioLayer;
+    weather?: AudioLayer;
+    music?: AudioLayer;
+  }>(() => {
+    const saved = localStorage.getItem("ambience-mixer-current-layers");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved layers:", e);
+      }
+    }
+    return {
+      environment: mockScenes[0].environment,
+      weather: mockScenes[0].weather,
+      music: mockScenes[0].music,
+    };
+  });
 
   const audioEngineRef = useRef<AudioEngine | null>(null);
   const [audioInitialized, setAudioInitialized] = useState(false);
 
-  const currentScene = mockScenes.find((s) => s.id === sceneId)!;
+  const currentScene = scenes.find((s) => s.id === sceneId)!;
+
+  // Scene management handlers
+  const handleSaveScene = (scene: Scene) => {
+    const existingIndex = scenes.findIndex((s) => s.id === scene.id);
+    if (existingIndex >= 0) {
+      // Update existing scene
+      const updatedScenes = [...scenes];
+      updatedScenes[existingIndex] = scene;
+      setScenes(updatedScenes);
+    } else {
+      // Add new scene
+      setScenes([...scenes, scene]);
+    }
+  };
+
+  const handleDeleteScene = (deletingSceneId: string) => {
+    setScenes(scenes.filter((s) => s.id !== deletingSceneId));
+    // If deleting current scene, switch to first available scene
+    if (deletingSceneId === sceneId && scenes.length > 1) {
+      const remainingScenes = scenes.filter((s) => s.id !== deletingSceneId);
+      handleSceneChange(remainingScenes[0].id);
+    }
+  };
 
   // Initialize audio engine
   useEffect(() => {
     audioEngineRef.current = new AudioEngine();
   }, []);
+
+  // Persist scenes to localStorage
+  useEffect(() => {
+    localStorage.setItem("ambience-mixer-scenes", JSON.stringify(scenes));
+  }, [scenes]);
+
+  // Persist current scene to localStorage
+  useEffect(() => {
+    localStorage.setItem("ambience-mixer-current-scene", sceneId);
+  }, [sceneId]);
+
+  // Persist current layers to localStorage
+  useEffect(() => {
+    localStorage.setItem("ambience-mixer-current-layers", JSON.stringify(currentLayers));
+  }, [currentLayers]);
 
   // Initialize audio on first user interaction
   const initializeAudio = () => {
@@ -79,9 +161,36 @@ function App() {
   // Handle scene change
   const handleSceneChange = (newSceneId: string) => {
     setSceneId(newSceneId);
-    const newScene = mockScenes.find((s) => s.id === newSceneId)!;
+    const newScene = scenes.find((s) => s.id === newSceneId)!;
+
+    // Update current layers to match scene
+    setCurrentLayers({
+      environment: newScene.environment,
+      weather: newScene.weather,
+      music: newScene.music,
+    });
+
     if (audioInitialized) {
       loadScene(newScene);
+    }
+  };
+
+  // Handle layer selection from picker
+  const handleLayerSelect = async (layer: LayerType, item: AudioLayer) => {
+    // Update current layers state
+    setCurrentLayers((prev) => ({ ...prev, [layer]: item }));
+
+    // Load the new audio with crossfade
+    if (audioEngineRef.current && audioInitialized) {
+      try {
+        await audioEngineRef.current.loadLayer(
+          layer,
+          item.url,
+          muted[layer] ? 0 : volumes[layer] / 100
+        );
+      } catch (error) {
+        console.error(`Failed to load ${layer}:`, error);
+      }
     }
   };
 
@@ -152,12 +261,27 @@ function App() {
             <div className="font-semibold" style={{ color: theme.text }}>
               Scenes
             </div>
-            <div className="text-xs" style={{ color: theme.textMuted }}>
-              Scene‑aware One‑shots
-            </div>
+            <button
+              onClick={() => setSceneManagerOpen(true)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors"
+              style={{
+                background: theme.card,
+                color: theme.accent,
+                border: `1px solid rgba(0, 0, 0, 0.25)`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = theme.bgSoft;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = theme.card;
+              }}
+            >
+              <Settings2 className="w-3 h-3" />
+              Manage
+            </button>
           </div>
           <div className="flex flex-wrap gap-4">
-            {mockScenes.map((scene) => {
+            {scenes.map((scene) => {
               const SceneIcon = iconMap[scene.icon];
               return (
                 <SceneChip
@@ -205,22 +329,58 @@ function App() {
           <LayerTile
             label="Environment"
             icon={Trees}
-            selected={currentScene.environment}
-            onPick={() => console.log("Pick environment")}
+            selected={currentLayers.environment}
+            onPick={() => setPickerOpen("environment")}
           />
           <LayerTile
             label="Weather"
             icon={CloudRain}
-            selected={currentScene.weather}
-            onPick={() => console.log("Pick weather")}
+            selected={currentLayers.weather}
+            onPick={() => setPickerOpen("weather")}
           />
           <LayerTile
             label="Music"
             icon={Music}
-            selected={currentScene.music}
-            onPick={() => console.log("Pick music")}
+            selected={currentLayers.music}
+            onPick={() => setPickerOpen("music")}
           />
         </section>
+
+        {/* Layer Pickers */}
+        <LayerPicker
+          isOpen={pickerOpen === "environment"}
+          onClose={() => setPickerOpen(null)}
+          layerType="environment"
+          items={environmentLibrary}
+          currentSelection={currentLayers.environment}
+          onSelect={(item) => handleLayerSelect("environment", item)}
+        />
+        <LayerPicker
+          isOpen={pickerOpen === "weather"}
+          onClose={() => setPickerOpen(null)}
+          layerType="weather"
+          items={weatherLibrary}
+          currentSelection={currentLayers.weather}
+          onSelect={(item) => handleLayerSelect("weather", item)}
+        />
+        <LayerPicker
+          isOpen={pickerOpen === "music"}
+          onClose={() => setPickerOpen(null)}
+          layerType="music"
+          items={musicLibrary}
+          currentSelection={currentLayers.music}
+          onSelect={(item) => handleLayerSelect("music", item)}
+        />
+
+        {/* Scene Manager */}
+        <SceneManager
+          isOpen={sceneManagerOpen}
+          onClose={() => setSceneManagerOpen(false)}
+          scenes={scenes}
+          currentLayers={currentLayers}
+          onSaveScene={handleSaveScene}
+          onDeleteScene={handleDeleteScene}
+        />
 
         {/* One-Shots */}
         <Section className="p-3">

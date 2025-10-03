@@ -25,7 +25,10 @@ export class AudioEngine {
       source.loop = true;
 
       const gainNode = this.audioContext.createGain();
-      gainNode.gain.value = 0; // Start at 0 for crossfade
+      const currentTime = this.audioContext.currentTime;
+
+      // Set gain to 0 and schedule the crossfade immediately
+      gainNode.gain.setValueAtTime(0, currentTime);
 
       source.connect(gainNode);
       gainNode.connect(this.masterGain);
@@ -37,7 +40,9 @@ export class AudioEngine {
 
       // Crossfade in (skip if muted)
       if (volume > 0) {
-        await this.crossfadeLayer(type, volume, 1000);
+        // Schedule the ramp immediately without calling crossfadeLayer
+        const endTime = currentTime + 1; // 1 second crossfade
+        gainNode.gain.linearRampToValueAtTime(volume, endTime);
       }
       // If volume is 0 (muted), keep it at 0 without crossfading
     } catch (error) {
