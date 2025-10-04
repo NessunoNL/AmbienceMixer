@@ -59,9 +59,13 @@ export class AudioEngine {
 
       // Crossfade in with exponential curve (skip if muted)
       if (volume > 0) {
+        // Get fresh current time after audio load (in case it took time)
+        const fadeStartTime = this.audioContext.currentTime;
         // Use setTargetAtTime for smooth exponential fade
         // Time constant = duration / 5 gives ~99% completion at duration
-        gainNode.gain.setTargetAtTime(volume, currentTime, timeConstant);
+        gainNode.gain.cancelScheduledValues(fadeStartTime);
+        gainNode.gain.setValueAtTime(0, fadeStartTime);
+        gainNode.gain.setTargetAtTime(volume, fadeStartTime, timeConstant);
       }
       // If volume is 0 (muted), keep it at 0 without crossfading
     } catch (error) {

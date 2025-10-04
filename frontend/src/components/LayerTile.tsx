@@ -26,7 +26,7 @@ export const LayerTile: React.FC<LayerTileProps> = ({
   const presets = [
     { label: "Quick", value: 0.5 },
     { label: "Normal", value: defaultDuration },
-    { label: "Long", value: 6.0 },
+    { label: "Long", value: 10.0 },
   ];
 
   return (

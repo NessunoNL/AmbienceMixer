@@ -70,9 +70,9 @@ function App() {
 
   // Default crossfade durations per layer type (in seconds)
   const defaultCrossfadeDurations = {
-    environment: 1.5,
-    weather: 4.0,
-    music: 3.0,
+    environment: 6.0,
+    weather: 6.0,
+    music: 6.0,
   };
 
   // Track queued layer selections (prepared but not yet activated)
