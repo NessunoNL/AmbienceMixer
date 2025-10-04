@@ -49,9 +49,9 @@ function App() {
 
   // Track current layer selections (independent of scenes) - load from localStorage
   const [currentLayers, setCurrentLayers] = useState<{
-    environment?: AudioLayer;
-    weather?: AudioLayer;
-    music?: AudioLayer;
+    environment?: AudioLayer | null;
+    weather?: AudioLayer | null;
+    music?: AudioLayer | null;
   }>(() => {
     const saved = localStorage.getItem("ambience-mixer-current-layers");
     if (saved) {
