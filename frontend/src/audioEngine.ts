@@ -12,8 +12,27 @@ export class AudioEngine {
   }
 
   async loadLayer(type: LayerType, url: string, volume: number = 1, crossfadeDuration: number = 1.5): Promise<void> {
-    // Stop existing layer immediately (no fade to avoid race condition)
-    this.stopLayer(type, false);
+    // Get existing layer for crossfade
+    const oldLayer = this.layers.get(type);
+    const currentTime = this.audioContext.currentTime;
+    const timeConstant = crossfadeDuration / 5;
+
+    // If there's an old layer, fade it out while we fade in the new one
+    if (oldLayer) {
+      oldLayer.gainNode.gain.cancelScheduledValues(currentTime);
+      oldLayer.gainNode.gain.setValueAtTime(oldLayer.gainNode.gain.value, currentTime);
+      oldLayer.gainNode.gain.setTargetAtTime(0, currentTime, timeConstant);
+
+      // Schedule cleanup after crossfade completes
+      setTimeout(() => {
+        if (oldLayer.audioElement) {
+          oldLayer.audioElement.pause();
+          oldLayer.audioElement.currentTime = 0;
+        } else {
+          (oldLayer.source as AudioBufferSourceNode).stop();
+        }
+      }, crossfadeDuration * 1000 * 5); // Wait for exponential fade to complete (~5 time constants)
+    }
 
     try {
       // Use streaming playback for looping layers (faster load times)
@@ -25,7 +44,6 @@ export class AudioEngine {
       const source = this.audioContext.createMediaElementSource(audio);
 
       const gainNode = this.audioContext.createGain();
-      const currentTime = this.audioContext.currentTime;
 
       // Set gain to 0 and schedule the crossfade immediately
       gainNode.gain.setValueAtTime(0, currentTime);
@@ -43,7 +61,6 @@ export class AudioEngine {
       if (volume > 0) {
         // Use setTargetAtTime for smooth exponential fade
         // Time constant = duration / 5 gives ~99% completion at duration
-        const timeConstant = crossfadeDuration / 5;
         gainNode.gain.setTargetAtTime(volume, currentTime, timeConstant);
       }
       // If volume is 0 (muted), keep it at 0 without crossfading
