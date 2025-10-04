@@ -125,18 +125,20 @@ This will:
 
 In NPM, create a new Proxy Host:
 
-- **Domain Names**: `ambience.brouwerhomelab.nl`
+- **Domain Names**: `ambience.home.brouwerhomelab.nl`
 - **Scheme**: `http`
 - **Forward Hostname / IP**: `ambience-mixer` (Docker container name)
 - **Forward Port**: `3000`
-- **SSL**: Request Let's Encrypt certificate
+- **SSL**: Use self-signed certificate or local CA (LAN-only access)
 - **Websockets Support**: ON (for future features)
 
 The container is on the `frontend` network (shared with NPM), so no port binding is needed.
 
+**Note**: The `.home` subdomain ensures the app is only accessible on your LAN for security.
+
 ### 4. Access the App
 
-Navigate to `https://ambience.brouwerhomelab.nl` and click anywhere to initialize audio.
+Navigate to `https://ambience.home.brouwerhomelab.nl` from any device on your local network and click anywhere to initialize audio.
 
 ## Development
 
@@ -165,7 +167,7 @@ Requires `/mnt/ambience` mount or set `AUDIO_DIR=/path/to/local/audio/folder`.
 Trigger a rescan via API:
 
 ```bash
-curl -X POST https://ambience.brouwerhomelab.nl/api/audio/scan
+curl -X POST https://ambience.home.brouwerhomelab.nl/api/audio/scan
 ```
 
 ## API Endpoints
