@@ -70,9 +70,9 @@ function App() {
 
   // Track queued layer selections (prepared but not yet activated)
   const [queuedLayers, setQueuedLayers] = useState<{
-    environment?: AudioLayer;
-    weather?: AudioLayer;
-    music?: AudioLayer;
+    environment?: AudioLayer | null;
+    weather?: AudioLayer | null;
+    music?: AudioLayer | null;
   }>({});
 
   const audioEngineRef = useRef<AudioEngine | null>(null);
@@ -253,7 +253,7 @@ function App() {
   };
 
   // Handle layer selection from picker - add to queue instead of loading immediately
-  const handleLayerSelect = (layer: LayerType, item: AudioLayer) => {
+  const handleLayerSelect = (layer: LayerType, item: AudioLayer | null) => {
     setQueuedLayers((prev) => ({ ...prev, [layer]: item }));
   };
 
@@ -264,6 +264,13 @@ function App() {
     // Load all queued layers in parallel with crossfade
     const loadPromises = Object.entries(queuedLayers).map(([layerType, layer]) => {
       const type = layerType as LayerType;
+
+      // If layer is null, stop the layer (silence)
+      if (layer === null) {
+        audioEngineRef.current!.stopLayer(type, true);
+        return Promise.resolve();
+      }
+
       return audioEngineRef.current!.loadLayer(
         type,
         layer.url,

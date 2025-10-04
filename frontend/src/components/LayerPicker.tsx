@@ -9,7 +9,7 @@ interface LayerPickerProps {
   layerType: LayerType;
   items: AudioLayer[];
   currentSelection?: AudioLayer | null;
-  onSelect: (item: AudioLayer) => void;
+  onSelect: (item: AudioLayer | null) => void;
 }
 
 export const LayerPicker: React.FC<LayerPickerProps> = ({
@@ -88,6 +88,68 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* No Sound Option */}
+              <button
+                onClick={() => {
+                  onSelect(null);
+                  onClose();
+                }}
+                className="flex items-center gap-3 p-3 rounded-xl transition-all text-left"
+                style={{
+                  background: !currentSelection ? theme.primary : theme.card,
+                  border: !currentSelection
+                    ? `2px solid ${theme.primary}`
+                    : "1px solid rgba(0, 0, 0, 0.25)",
+                  color: !currentSelection ? theme.bg : theme.text,
+                  boxShadow: !currentSelection
+                    ? `0 0 0 3px rgba(167, 192, 128, 0.2)`
+                    : "0 2px 6px rgba(0, 0, 0, 0.3)",
+                }}
+                onMouseEnter={(e) => {
+                  if (currentSelection) {
+                    e.currentTarget.style.background = theme.bgSoft;
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (currentSelection) {
+                    e.currentTarget.style.background = theme.card;
+                    e.currentTarget.style.transform = "translateY(0)";
+                  }
+                }}
+              >
+                <div
+                  className="w-12 h-12 rounded-lg flex items-center justify-center"
+                  style={{
+                    background: !currentSelection
+                      ? "rgba(0, 0, 0, 0.2)"
+                      : theme.bgSoft,
+                    border: "1px solid rgba(0, 0, 0, 0.25)",
+                  }}
+                >
+                  <div
+                    className="text-2xl"
+                    style={{
+                      color: !currentSelection ? theme.text : theme.textMuted,
+                    }}
+                  >
+                    ∅
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium">No Sound</div>
+                  <div
+                    className="text-xs mt-0.5"
+                    style={{
+                      color: !currentSelection ? theme.bg : theme.textMuted,
+                      opacity: 0.8,
+                    }}
+                  >
+                    {!currentSelection ? "Currently silent" : "Click to select"}
+                  </div>
+                </div>
+              </button>
+
               {items.map((item) => {
                 const isSelected = currentSelection?.id === item.id;
                 return (
