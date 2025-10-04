@@ -8,31 +8,31 @@ import { OneShotButton } from "./components/OneShotButton";
 import { LayerPicker } from "./components/LayerPicker";
 import { SceneManager } from "./components/SceneManager";
 import { AudioEngine } from "./audioEngine";
-import { mockScenes, iconMap, environmentLibrary, weatherLibrary, musicLibrary } from "./mockData";
+import { mockScenes, iconMap } from "./mockData";
+import { api } from "./services/api";
 import { theme } from "./theme";
 import type { LayerType, AudioLayer, Scene } from "./types";
+import type { AudioFile } from "./services/api";
 
 function App() {
-  // Scene management - load from localStorage or use defaults
-  const [scenes, setScenes] = useState<Scene[]>(() => {
-    const saved = localStorage.getItem("ambience-mixer-scenes");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse saved scenes:", e);
-        return mockScenes;
-      }
-    }
-    return mockScenes;
+  // Audio library from backend
+  const [audioLibrary, setAudioLibrary] = useState<{
+    environment: AudioLayer[];
+    weather: AudioLayer[];
+    music: AudioLayer[];
+    oneshots: AudioLayer[];
+  }>({
+    environment: [],
+    weather: [],
+    music: [],
+    oneshots: [],
   });
 
-  const [sceneId, setSceneId] = useState(() => {
-    const savedSceneId = localStorage.getItem("ambience-mixer-current-scene");
-    return savedSceneId || mockScenes[0].id;
-  });
-
+  // Scene management - will load from backend
+  const [scenes, setScenes] = useState<Scene[]>([]);
+  const [sceneId, setSceneId] = useState<string>("");
   const [sceneManagerOpen, setSceneManagerOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [volumes, setVolumes] = useState({
     environment: 70,
@@ -71,28 +71,62 @@ function App() {
   const audioEngineRef = useRef<AudioEngine | null>(null);
   const [audioInitialized, setAudioInitialized] = useState(false);
 
-  const currentScene = scenes.find((s) => s.id === sceneId)!;
+  const currentScene = scenes.find((s) => s.id === sceneId);
 
-  // Scene management handlers
-  const handleSaveScene = (scene: Scene) => {
-    const existingIndex = scenes.findIndex((s) => s.id === scene.id);
-    if (existingIndex >= 0) {
-      // Update existing scene
-      const updatedScenes = [...scenes];
-      updatedScenes[existingIndex] = scene;
-      setScenes(updatedScenes);
-    } else {
-      // Add new scene
-      setScenes([...scenes, scene]);
+  // Helper function to convert backend AudioFile to frontend AudioLayer
+  const convertAudioFile = (file: AudioFile): AudioLayer => ({
+    id: file.id.toString(),
+    name: file.name,
+    url: api.getAudioStreamUrl(file.id),
+    volume: file.volume,
+  });
+
+  // Scene management handlers - now using backend API
+  const handleSaveScene = async (scene: Scene) => {
+    try {
+      const existingIndex = scenes.findIndex((s) => s.id === scene.id);
+
+      // Prepare scene data for backend (convert to audio file IDs)
+      const sceneData = {
+        id: scene.id,
+        label: scene.label,
+        icon: scene.icon,
+        environment_id: scene.environment ? parseInt(scene.environment.id) : null,
+        weather_id: scene.weather ? parseInt(scene.weather.id) : null,
+        music_id: scene.music ? parseInt(scene.music.id) : null,
+        oneshots: scene.oneshots.map(os => os.id),
+      };
+
+      if (existingIndex >= 0) {
+        // Update existing scene
+        await api.updateScene(scene.id, sceneData);
+        const updatedScenes = [...scenes];
+        updatedScenes[existingIndex] = scene;
+        setScenes(updatedScenes);
+      } else {
+        // Add new scene
+        await api.createScene(sceneData);
+        setScenes([...scenes, scene]);
+      }
+    } catch (error) {
+      console.error("Failed to save scene:", error);
+      alert("Failed to save scene. Please try again.");
     }
   };
 
-  const handleDeleteScene = (deletingSceneId: string) => {
-    setScenes(scenes.filter((s) => s.id !== deletingSceneId));
-    // If deleting current scene, switch to first available scene
-    if (deletingSceneId === sceneId && scenes.length > 1) {
-      const remainingScenes = scenes.filter((s) => s.id !== deletingSceneId);
-      handleSceneChange(remainingScenes[0].id);
+  const handleDeleteScene = async (deletingSceneId: string) => {
+    try {
+      await api.deleteScene(deletingSceneId);
+      setScenes(scenes.filter((s) => s.id !== deletingSceneId));
+
+      // If deleting current scene, switch to first available scene
+      if (deletingSceneId === sceneId && scenes.length > 1) {
+        const remainingScenes = scenes.filter((s) => s.id !== deletingSceneId);
+        handleSceneChange(remainingScenes[0].id);
+      }
+    } catch (error) {
+      console.error("Failed to delete scene:", error);
+      alert("Failed to delete scene. Please try again.");
     }
   };
 
@@ -101,17 +135,52 @@ function App() {
     audioEngineRef.current = new AudioEngine();
   }, []);
 
-  // Persist scenes to localStorage
+  // Load audio library and scenes from backend on mount
   useEffect(() => {
-    localStorage.setItem("ambience-mixer-scenes", JSON.stringify(scenes));
-  }, [scenes]);
+    const loadData = async () => {
+      try {
+        // Load audio library
+        const library = await api.getAudioLibrary();
+        const convertedLibrary = {
+          environment: library.environment.map(convertAudioFile),
+          weather: library.weather.map(convertAudioFile),
+          music: library.music.map(convertAudioFile),
+          oneshots: library.oneshots.map(convertAudioFile),
+        };
+        setAudioLibrary(convertedLibrary);
 
-  // Persist current scene to localStorage
+        // Load scenes from backend
+        const backendScenes = await api.getScenes();
+        if (backendScenes.length > 0) {
+          setScenes(backendScenes);
+          setSceneId(backendScenes[0].id);
+        } else {
+          // No scenes in backend, use mock scenes as fallback
+          setScenes(mockScenes);
+          setSceneId(mockScenes[0].id);
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Failed to load from backend, using mock data:", error);
+        // Fallback to mock data
+        setScenes(mockScenes);
+        setSceneId(mockScenes[0].id);
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Persist current scene to localStorage (as cache)
   useEffect(() => {
-    localStorage.setItem("ambience-mixer-current-scene", sceneId);
+    if (sceneId) {
+      localStorage.setItem("ambience-mixer-current-scene", sceneId);
+    }
   }, [sceneId]);
 
-  // Persist current layers to localStorage
+  // Persist current layers to localStorage (as cache)
   useEffect(() => {
     localStorage.setItem("ambience-mixer-current-layers", JSON.stringify(currentLayers));
   }, [currentLayers]);
@@ -161,7 +230,8 @@ function App() {
   // Handle scene change
   const handleSceneChange = (newSceneId: string) => {
     setSceneId(newSceneId);
-    const newScene = scenes.find((s) => s.id === newSceneId)!;
+    const newScene = scenes.find((s) => s.id === newSceneId);
+    if (!newScene) return;
 
     // Update current layers to match scene
     setCurrentLayers({
@@ -248,12 +318,23 @@ function App() {
           <h1 className="text-3xl font-bold" style={{ color: theme.primary }}>
             AmbientMixer
           </h1>
-          {!audioInitialized && (
+          {loading ? (
+            <p className="text-sm mt-2" style={{ color: theme.textMuted }}>
+              Loading audio library...
+            </p>
+          ) : !audioInitialized ? (
             <p className="text-sm mt-2" style={{ color: theme.textMuted }}>
               Click anywhere to start audio
             </p>
-          )}
+          ) : null}
         </div>
+
+        {loading ? (
+          <div className="text-center py-20" style={{ color: theme.textMuted }}>
+            Loading...
+          </div>
+        ) : (
+          <>
 
         {/* Scenes Section */}
         <Section className="p-3">
@@ -351,7 +432,7 @@ function App() {
           isOpen={pickerOpen === "environment"}
           onClose={() => setPickerOpen(null)}
           layerType="environment"
-          items={environmentLibrary}
+          items={audioLibrary.environment}
           currentSelection={currentLayers.environment}
           onSelect={(item) => handleLayerSelect("environment", item)}
         />
@@ -359,7 +440,7 @@ function App() {
           isOpen={pickerOpen === "weather"}
           onClose={() => setPickerOpen(null)}
           layerType="weather"
-          items={weatherLibrary}
+          items={audioLibrary.weather}
           currentSelection={currentLayers.weather}
           onSelect={(item) => handleLayerSelect("weather", item)}
         />
@@ -367,7 +448,7 @@ function App() {
           isOpen={pickerOpen === "music"}
           onClose={() => setPickerOpen(null)}
           layerType="music"
-          items={musicLibrary}
+          items={audioLibrary.music}
           currentSelection={currentLayers.music}
           onSelect={(item) => handleLayerSelect("music", item)}
         />
@@ -407,7 +488,7 @@ function App() {
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {currentScene.oneshots.map((oneshot) => {
+            {currentScene?.oneshots.map((oneshot) => {
               const OneShotIcon = iconMap[oneshot.icon];
               return (
                 <OneShotButton
@@ -420,6 +501,8 @@ function App() {
             })}
           </div>
         </Section>
+        </>
+        )}
       </main>
     </div>
   );

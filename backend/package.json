@@ -1,0 +1,24 @@
+{
+  "name": "ambience-mixer-backend",
+  "version": "1.0.0",
+  "description": "Backend API for AmbientMixer - DM audio mixing app",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "scan": "node src/services/audioScanner.js"
+  },
+  "keywords": ["audio", "dnd", "ambient", "mixer"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "music-metadata": "^10.5.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

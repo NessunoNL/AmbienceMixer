@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  ambience-mixer:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ambience-mixer
+    restart: unless-stopped
+    networks:
+      - frontend
+      - ambience_default
+    volumes:
+      - /mnt/ambience:/app/audio:ro  # Read-only audio files from NAS
+      - ./data:/app/data              # Persistent SQLite database
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - AUDIO_DIR=/app/audio
+      - DB_PATH=/app/data/ambience.db
+    # No ports exposed - accessed via frontend network from NPM
+
+networks:
+  frontend:
+    external: true  # Shared network with Nginx Proxy Manager
+  ambience_default:
+    driver: bridge   # Default network for future services (e.g., database)
