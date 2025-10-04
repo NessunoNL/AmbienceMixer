@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Music, CloudRain, Trees, Settings2 } from "lucide-react";
+import { Music, CloudRain, Trees, Settings2, VolumeX, Volume2 } from "lucide-react";
 import { Section } from "./components/Section";
 import { SceneChip } from "./components/SceneChip";
 import { VerticalFader } from "./components/VerticalFader";
@@ -44,6 +44,7 @@ function App() {
     weather: false,
     music: false,
   });
+  const [mainMuted, setMainMuted] = useState(false);
   const [oneShotVolume, setOneShotVolume] = useState(80);
   const [pickerOpen, setPickerOpen] = useState<LayerType | null>(null);
 
@@ -339,6 +340,29 @@ function App() {
     }
   };
 
+  // Handle main mute toggle (all layers)
+  const handleMainMuteToggle = () => {
+    const newMainMutedState = !mainMuted;
+    setMainMuted(newMainMutedState);
+
+    if (audioEngineRef.current && audioInitialized) {
+      const layers: LayerType[] = ["environment", "weather", "music"];
+
+      if (newMainMutedState) {
+        // Fade all layers to 0 when main muting
+        layers.forEach((layer) => {
+          audioEngineRef.current!.setVolume(layer, 0, 0.3);
+        });
+      } else {
+        // Fade back to current volumes when unmuting (respect individual mute states)
+        layers.forEach((layer) => {
+          const targetVolume = muted[layer] ? 0 : volumes[layer] / 100;
+          audioEngineRef.current!.setVolume(layer, targetVolume, 0.3);
+        });
+      }
+    }
+  };
+
   // Handle one-shot trigger
   const handleOneShotTrigger = async (url: string) => {
     const volume = oneShotVolume / 100;
@@ -366,9 +390,31 @@ function App() {
       <main className="mx-auto max-w-5xl px-4 py-6 space-y-6">
         {/* Header */}
         <div className="text-center mb-4">
-          <h1 className="text-3xl font-bold" style={{ color: theme.primary }}>
-            AmbientMixer
-          </h1>
+          <div className="flex items-center justify-center gap-4 mb-2">
+            <h1 className="text-3xl font-bold" style={{ color: theme.primary }}>
+              AmbientMixer
+            </h1>
+            {audioInitialized && (
+              <button
+                onClick={handleMainMuteToggle}
+                className="p-2 rounded-lg transition-colors"
+                style={{
+                  background: mainMuted ? theme.card : theme.bgSoft,
+                  color: mainMuted ? theme.textMuted : theme.primary,
+                  border: `1px solid ${mainMuted ? 'rgba(0, 0, 0, 0.25)' : theme.primary}`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = "0.8";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = "1";
+                }}
+                title={mainMuted ? "Unmute all" : "Mute all"}
+              >
+                {mainMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </button>
+            )}
+          </div>
           {loading ? (
             <p className="text-sm mt-2" style={{ color: theme.textMuted }}>
               Loading audio library...
