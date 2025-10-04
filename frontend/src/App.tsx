@@ -68,6 +68,13 @@ function App() {
     };
   });
 
+  // Track queued layer selections (prepared but not yet activated)
+  const [queuedLayers, setQueuedLayers] = useState<{
+    environment?: AudioLayer;
+    weather?: AudioLayer;
+    music?: AudioLayer;
+  }>({});
+
   const audioEngineRef = useRef<AudioEngine | null>(null);
   const [audioInitialized, setAudioInitialized] = useState(false);
 
@@ -245,22 +252,35 @@ function App() {
     }
   };
 
-  // Handle layer selection from picker
-  const handleLayerSelect = async (layer: LayerType, item: AudioLayer) => {
-    // Update current layers state
-    setCurrentLayers((prev) => ({ ...prev, [layer]: item }));
+  // Handle layer selection from picker - add to queue instead of loading immediately
+  const handleLayerSelect = (layer: LayerType, item: AudioLayer) => {
+    setQueuedLayers((prev) => ({ ...prev, [layer]: item }));
+  };
 
-    // Load the new audio with crossfade
-    if (audioEngineRef.current && audioInitialized) {
-      try {
-        await audioEngineRef.current.loadLayer(
-          layer,
-          item.url,
-          muted[layer] ? 0 : volumes[layer] / 100
-        );
-      } catch (error) {
-        console.error(`Failed to load ${layer}:`, error);
-      }
+  // Handle queue switch - load all queued layers with crossfade
+  const handleQueueSwitch = async () => {
+    if (!audioEngineRef.current || !audioInitialized) return;
+
+    // Load all queued layers in parallel with crossfade
+    const loadPromises = Object.entries(queuedLayers).map(([layerType, layer]) => {
+      const type = layerType as LayerType;
+      return audioEngineRef.current!.loadLayer(
+        type,
+        layer.url,
+        muted[type] ? 0 : volumes[type] / 100
+      );
+    });
+
+    try {
+      await Promise.all(loadPromises);
+
+      // Update current layers with queued layers
+      setCurrentLayers((prev) => ({ ...prev, ...queuedLayers }));
+
+      // Clear the queue
+      setQueuedLayers({});
+    } catch (error) {
+      console.error("Failed to switch layers:", error);
     }
   };
 
@@ -342,24 +362,45 @@ function App() {
             <div className="font-semibold" style={{ color: theme.text }}>
               Scenes
             </div>
-            <button
-              onClick={() => setSceneManagerOpen(true)}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors"
-              style={{
-                background: theme.card,
-                color: theme.accent,
-                border: `1px solid rgba(0, 0, 0, 0.25)`,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = theme.bgSoft;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = theme.card;
-              }}
-            >
-              <Settings2 className="w-3 h-3" />
-              Manage
-            </button>
+            <div className="flex items-center gap-2">
+              {Object.keys(queuedLayers).length > 0 && (
+                <button
+                  onClick={handleQueueSwitch}
+                  className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-colors"
+                  style={{
+                    background: theme.accent,
+                    color: theme.bg,
+                    border: `1px solid rgba(0, 0, 0, 0.25)`,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = "0.9";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                  }}
+                >
+                  Switch ({Object.keys(queuedLayers).length})
+                </button>
+              )}
+              <button
+                onClick={() => setSceneManagerOpen(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors"
+                style={{
+                  background: theme.card,
+                  color: theme.accent,
+                  border: `1px solid rgba(0, 0, 0, 0.25)`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = theme.bgSoft;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = theme.card;
+                }}
+              >
+                <Settings2 className="w-3 h-3" />
+                Manage
+              </button>
+            </div>
           </div>
           <div className="flex flex-wrap gap-4">
             {scenes.map((scene) => {
@@ -411,18 +452,21 @@ function App() {
             label="Environment"
             icon={Trees}
             selected={currentLayers.environment}
+            queued={queuedLayers.environment}
             onPick={() => setPickerOpen("environment")}
           />
           <LayerTile
             label="Weather"
             icon={CloudRain}
             selected={currentLayers.weather}
+            queued={queuedLayers.weather}
             onPick={() => setPickerOpen("weather")}
           />
           <LayerTile
             label="Music"
             icon={Music}
             selected={currentLayers.music}
+            queued={queuedLayers.music}
             onPick={() => setPickerOpen("music")}
           />
         </section>
