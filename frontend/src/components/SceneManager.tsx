@@ -77,9 +77,9 @@ export const SceneManager: React.FC<SceneManagerProps> = ({
       id: editMode === "create" ? `scene-${Date.now()}` : editingScene!.id,
       label: formData.label,
       icon: formData.icon,
-      environment: currentLayers.environment,
-      weather: currentLayers.weather,
-      music: currentLayers.music,
+      environment: currentLayers.environment || undefined,
+      weather: currentLayers.weather || undefined,
+      music: currentLayers.music || undefined,
       oneshots: selectedOneShots,
     };
 
