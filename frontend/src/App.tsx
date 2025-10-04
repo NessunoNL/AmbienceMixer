@@ -68,11 +68,18 @@ function App() {
     };
   });
 
+  // Default crossfade durations per layer type (in seconds)
+  const defaultCrossfadeDurations = {
+    environment: 1.5,
+    weather: 4.0,
+    music: 3.0,
+  };
+
   // Track queued layer selections (prepared but not yet activated)
   const [queuedLayers, setQueuedLayers] = useState<{
-    environment?: AudioLayer | null;
-    weather?: AudioLayer | null;
-    music?: AudioLayer | null;
+    environment?: { layer: AudioLayer | null; duration: number };
+    weather?: { layer: AudioLayer | null; duration: number };
+    music?: { layer: AudioLayer | null; duration: number };
   }>({});
 
   const audioEngineRef = useRef<AudioEngine | null>(null);
@@ -254,7 +261,19 @@ function App() {
 
   // Handle layer selection from picker - add to queue instead of loading immediately
   const handleLayerSelect = (layer: LayerType, item: AudioLayer | null) => {
-    setQueuedLayers((prev) => ({ ...prev, [layer]: item }));
+    setQueuedLayers((prev) => ({
+      ...prev,
+      [layer]: { layer: item, duration: defaultCrossfadeDurations[layer] }
+    }));
+  };
+
+  // Handle crossfade duration change for a queued layer
+  const handleDurationChange = (layer: LayerType, duration: number) => {
+    setQueuedLayers((prev) => {
+      const existing = prev[layer];
+      if (!existing) return prev;
+      return { ...prev, [layer]: { ...existing, duration } };
+    });
   };
 
   // Handle queue switch - load all queued layers with crossfade
@@ -262,27 +281,32 @@ function App() {
     if (!audioEngineRef.current || !audioInitialized) return;
 
     // Load all queued layers in parallel with crossfade
-    const loadPromises = Object.entries(queuedLayers).map(([layerType, layer]) => {
+    const loadPromises = Object.entries(queuedLayers).map(([layerType, queuedItem]) => {
       const type = layerType as LayerType;
 
       // If layer is null, stop the layer (silence)
-      if (layer === null) {
+      if (queuedItem.layer === null) {
         audioEngineRef.current!.stopLayer(type, true);
         return Promise.resolve();
       }
 
       return audioEngineRef.current!.loadLayer(
         type,
-        layer.url,
-        muted[type] ? 0 : volumes[type] / 100
+        queuedItem.layer.url,
+        muted[type] ? 0 : volumes[type] / 100,
+        queuedItem.duration
       );
     });
 
     try {
       await Promise.all(loadPromises);
 
-      // Update current layers with queued layers
-      setCurrentLayers((prev) => ({ ...prev, ...queuedLayers }));
+      // Update current layers with queued layers (extract just the layer, not duration)
+      const newLayers = Object.entries(queuedLayers).reduce((acc, [key, value]) => {
+        acc[key as LayerType] = value.layer;
+        return acc;
+      }, {} as typeof currentLayers);
+      setCurrentLayers((prev) => ({ ...prev, ...newLayers }));
 
       // Clear the queue
       setQueuedLayers({});
@@ -460,21 +484,27 @@ function App() {
             icon={Trees}
             selected={currentLayers.environment}
             queued={queuedLayers.environment}
+            defaultDuration={defaultCrossfadeDurations.environment}
             onPick={() => setPickerOpen("environment")}
+            onDurationChange={(duration) => handleDurationChange("environment", duration)}
           />
           <LayerTile
             label="Weather"
             icon={CloudRain}
             selected={currentLayers.weather}
             queued={queuedLayers.weather}
+            defaultDuration={defaultCrossfadeDurations.weather}
             onPick={() => setPickerOpen("weather")}
+            onDurationChange={(duration) => handleDurationChange("weather", duration)}
           />
           <LayerTile
             label="Music"
             icon={Music}
             selected={currentLayers.music}
             queued={queuedLayers.music}
+            defaultDuration={defaultCrossfadeDurations.music}
             onPick={() => setPickerOpen("music")}
+            onDurationChange={(duration) => handleDurationChange("music", duration)}
           />
         </section>
 

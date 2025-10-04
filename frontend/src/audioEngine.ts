@@ -11,7 +11,7 @@ export class AudioEngine {
     this.masterGain.connect(this.audioContext.destination);
   }
 
-  async loadLayer(type: LayerType, url: string, volume: number = 1): Promise<void> {
+  async loadLayer(type: LayerType, url: string, volume: number = 1, crossfadeDuration: number = 1.5): Promise<void> {
     // Stop existing layer immediately (no fade to avoid race condition)
     this.stopLayer(type, false);
 
@@ -39,11 +39,12 @@ export class AudioEngine {
       const layer = new AudioLayerInstance(source, gainNode, audio);
       this.layers.set(type, layer);
 
-      // Crossfade in (skip if muted)
+      // Crossfade in with exponential curve (skip if muted)
       if (volume > 0) {
-        // Schedule the ramp immediately without calling crossfadeLayer
-        const endTime = currentTime + 1; // 1 second crossfade
-        gainNode.gain.linearRampToValueAtTime(volume, endTime);
+        // Use setTargetAtTime for smooth exponential fade
+        // Time constant = duration / 5 gives ~99% completion at duration
+        const timeConstant = crossfadeDuration / 5;
+        gainNode.gain.setTargetAtTime(volume, currentTime, timeConstant);
       }
       // If volume is 0 (muted), keep it at 0 without crossfading
     } catch (error) {
@@ -57,11 +58,11 @@ export class AudioEngine {
     if (!layer) return;
 
     const currentTime = this.audioContext.currentTime;
-    const endTime = currentTime + duration / 1000;
+    const timeConstant = (duration / 1000) / 5; // Convert ms to seconds, divide by 5 for exponential curve
 
     layer.gainNode.gain.cancelScheduledValues(currentTime);
     layer.gainNode.gain.setValueAtTime(layer.gainNode.gain.value, currentTime);
-    layer.gainNode.gain.linearRampToValueAtTime(targetVolume, endTime);
+    layer.gainNode.gain.setTargetAtTime(targetVolume, currentTime, timeConstant);
   }
 
   setVolume(type: LayerType, volume: number, fadeDuration: number = 0.05): void {
@@ -69,11 +70,11 @@ export class AudioEngine {
     if (!layer) return;
 
     const currentTime = this.audioContext.currentTime;
-    const endTime = currentTime + fadeDuration;
+    const timeConstant = fadeDuration / 5; // Exponential curve
 
     layer.gainNode.gain.cancelScheduledValues(currentTime);
     layer.gainNode.gain.setValueAtTime(layer.gainNode.gain.value, currentTime);
-    layer.gainNode.gain.linearRampToValueAtTime(volume, endTime);
+    layer.gainNode.gain.setTargetAtTime(volume, currentTime, timeConstant);
   }
 
   async stopLayer(type: LayerType, fadeOut: boolean = true): Promise<void> {
