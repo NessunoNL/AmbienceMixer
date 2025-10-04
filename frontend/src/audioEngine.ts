@@ -94,12 +94,13 @@ export class AudioEngine {
     layer.gainNode.gain.setTargetAtTime(volume, currentTime, timeConstant);
   }
 
-  async stopLayer(type: LayerType, fadeOut: boolean = true): Promise<void> {
+  async stopLayer(type: LayerType, fadeOut: boolean = true, fadeDuration: number = 0.5): Promise<void> {
     const layer = this.layers.get(type);
     if (!layer) return;
 
     if (fadeOut) {
-      await this.crossfadeLayer(type, 0, 500);
+      const durationMs = fadeDuration * 1000;
+      await this.crossfadeLayer(type, 0, durationMs);
       setTimeout(() => {
         // Handle both streaming and buffer-based sources
         if (layer.audioElement) {
@@ -109,7 +110,7 @@ export class AudioEngine {
           (layer.source as AudioBufferSourceNode).stop();
         }
         this.layers.delete(type);
-      }, 500);
+      }, durationMs * 5); // Wait for exponential fade to complete (~5 time constants)
     } else {
       // Handle both streaming and buffer-based sources
       if (layer.audioElement) {

@@ -284,9 +284,9 @@ function App() {
     const loadPromises = Object.entries(queuedLayers).map(([layerType, queuedItem]) => {
       const type = layerType as LayerType;
 
-      // If layer is null, stop the layer (silence)
+      // If layer is null, stop the layer (silence) with user-selected duration
       if (queuedItem.layer === null) {
-        audioEngineRef.current!.stopLayer(type, true);
+        audioEngineRef.current!.stopLayer(type, true, queuedItem.duration);
         return Promise.resolve();
       }
 
