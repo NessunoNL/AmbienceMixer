@@ -3,6 +3,7 @@ import type { LayerType } from "./types";
 export class AudioEngine {
   private audioContext: AudioContext;
   private layers: Map<LayerType, AudioLayerInstance> = new Map();
+  private fadingOutLayers: Set<AudioLayerInstance> = new Set();
   private masterGain: GainNode;
 
   constructor() {
@@ -12,25 +13,37 @@ export class AudioEngine {
   }
 
   async loadLayer(type: LayerType, url: string, volume: number = 1, crossfadeDuration: number = 1.5): Promise<void> {
-    // Get existing layer for crossfade
+    // Get existing layer and move to fading out state
     const oldLayer = this.layers.get(type);
     const currentTime = this.audioContext.currentTime;
     const timeConstant = crossfadeDuration / 5;
 
-    // If there's an old layer, fade it out while we fade in the new one
+    // Remove old layer from active map immediately (before starting new one)
     if (oldLayer) {
+      this.layers.delete(type);
+      this.fadingOutLayers.add(oldLayer);
+
+      // Fade out old layer
       oldLayer.gainNode.gain.cancelScheduledValues(currentTime);
       oldLayer.gainNode.gain.setValueAtTime(oldLayer.gainNode.gain.value, currentTime);
       oldLayer.gainNode.gain.setTargetAtTime(0, currentTime, timeConstant);
 
       // Schedule cleanup after crossfade completes
       setTimeout(() => {
+        // Stop audio source
         if (oldLayer.audioElement) {
           oldLayer.audioElement.pause();
           oldLayer.audioElement.currentTime = 0;
         } else {
           (oldLayer.source as AudioBufferSourceNode).stop();
         }
+
+        // Disconnect audio nodes from graph
+        oldLayer.gainNode.disconnect();
+        oldLayer.source.disconnect();
+
+        // Remove from fading out tracking
+        this.fadingOutLayers.delete(oldLayer);
       }, crossfadeDuration * 1000 * 5); // Wait for exponential fade to complete (~5 time constants)
     }
 
@@ -54,8 +67,10 @@ export class AudioEngine {
       // Start playing (will stream from server)
       await audio.play();
 
-      const layer = new AudioLayerInstance(source, gainNode, audio);
-      this.layers.set(type, layer);
+      const newLayer = new AudioLayerInstance(source, gainNode, audio);
+
+      // Set new layer in map immediately so commands target the correct layer
+      this.layers.set(type, newLayer);
 
       // Crossfade in with exponential curve (skip if muted)
       if (volume > 0) {
@@ -102,28 +117,50 @@ export class AudioEngine {
     const layer = this.layers.get(type);
     if (!layer) return;
 
+    // Remove from active layers map immediately
+    this.layers.delete(type);
+
     if (fadeOut) {
+      // Add to fading out tracking
+      this.fadingOutLayers.add(layer);
+
       const durationMs = fadeDuration * 1000;
-      await this.crossfadeLayer(type, 0, durationMs);
+      const currentTime = this.audioContext.currentTime;
+      const timeConstant = (fadeDuration) / 5;
+
+      // Fade out
+      layer.gainNode.gain.cancelScheduledValues(currentTime);
+      layer.gainNode.gain.setValueAtTime(layer.gainNode.gain.value, currentTime);
+      layer.gainNode.gain.setTargetAtTime(0, currentTime, timeConstant);
+
       setTimeout(() => {
-        // Handle both streaming and buffer-based sources
+        // Stop audio source
         if (layer.audioElement) {
           layer.audioElement.pause();
           layer.audioElement.currentTime = 0;
         } else {
           (layer.source as AudioBufferSourceNode).stop();
         }
-        this.layers.delete(type);
+
+        // Disconnect audio nodes from graph
+        layer.gainNode.disconnect();
+        layer.source.disconnect();
+
+        // Remove from fading out tracking
+        this.fadingOutLayers.delete(layer);
       }, durationMs * 5); // Wait for exponential fade to complete (~5 time constants)
     } else {
-      // Handle both streaming and buffer-based sources
+      // Stop immediately without fade
       if (layer.audioElement) {
         layer.audioElement.pause();
         layer.audioElement.currentTime = 0;
       } else {
         (layer.source as AudioBufferSourceNode).stop();
       }
-      this.layers.delete(type);
+
+      // Disconnect audio nodes from graph
+      layer.gainNode.disconnect();
+      layer.source.disconnect();
     }
   }
 
