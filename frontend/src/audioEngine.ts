@@ -16,13 +16,13 @@ export class AudioEngine {
     this.stopLayer(type, false);
 
     try {
-      const response = await fetch(url);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      // Use streaming playback for looping layers (faster load times)
+      const audio = new Audio(url);
+      audio.loop = true;
+      audio.preload = "auto";
 
-      const source = this.audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.loop = true;
+      // Create media element source node for streaming
+      const source = this.audioContext.createMediaElementSource(audio);
 
       const gainNode = this.audioContext.createGain();
       const currentTime = this.audioContext.currentTime;
@@ -33,9 +33,10 @@ export class AudioEngine {
       source.connect(gainNode);
       gainNode.connect(this.masterGain);
 
-      source.start(0);
+      // Start playing (will stream from server)
+      await audio.play();
 
-      const layer = new AudioLayerInstance(source, gainNode);
+      const layer = new AudioLayerInstance(source, gainNode, audio);
       this.layers.set(type, layer);
 
       // Crossfade in (skip if muted)
@@ -82,11 +83,23 @@ export class AudioEngine {
     if (fadeOut) {
       await this.crossfadeLayer(type, 0, 500);
       setTimeout(() => {
-        layer.source.stop();
+        // Handle both streaming and buffer-based sources
+        if (layer.audioElement) {
+          layer.audioElement.pause();
+          layer.audioElement.currentTime = 0;
+        } else {
+          (layer.source as AudioBufferSourceNode).stop();
+        }
         this.layers.delete(type);
       }, 500);
     } else {
-      layer.source.stop();
+      // Handle both streaming and buffer-based sources
+      if (layer.audioElement) {
+        layer.audioElement.pause();
+        layer.audioElement.currentTime = 0;
+      } else {
+        (layer.source as AudioBufferSourceNode).stop();
+      }
       this.layers.delete(type);
     }
   }
@@ -136,11 +149,17 @@ export class AudioEngine {
 }
 
 class AudioLayerInstance {
-  source: AudioBufferSourceNode;
+  source: AudioBufferSourceNode | MediaElementAudioSourceNode;
   gainNode: GainNode;
+  audioElement?: HTMLAudioElement; // For streaming playback
 
-  constructor(source: AudioBufferSourceNode, gainNode: GainNode) {
+  constructor(
+    source: AudioBufferSourceNode | MediaElementAudioSourceNode,
+    gainNode: GainNode,
+    audioElement?: HTMLAudioElement
+  ) {
     this.source = source;
     this.gainNode = gainNode;
+    this.audioElement = audioElement;
   }
 }
