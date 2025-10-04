@@ -25,7 +25,7 @@ RUN npm ci --only=production
 COPY backend/src ./src
 
 # Copy built frontend from stage 1
-COPY --from=frontend-build /app/frontend/dist ./public
+COPY --from=frontend-build /app/backend/public ./public
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
