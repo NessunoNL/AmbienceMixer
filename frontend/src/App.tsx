@@ -195,8 +195,8 @@ function App() {
   };
 
   // Load scene audio
-  const loadScene = async (scene: typeof currentScene) => {
-    if (!audioEngineRef.current || !audioInitialized) return;
+  const loadScene = async (scene: Scene | undefined) => {
+    if (!audioEngineRef.current || !audioInitialized || !scene) return;
 
     try {
       if (scene.environment) {

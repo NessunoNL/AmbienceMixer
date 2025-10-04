@@ -21,7 +21,6 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
   onMute,
   muted,
 }) => {
-  const sliderRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 

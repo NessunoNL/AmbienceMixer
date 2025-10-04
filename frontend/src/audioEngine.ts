@@ -136,8 +136,11 @@ export class AudioEngine {
 }
 
 class AudioLayerInstance {
-  constructor(
-    public source: AudioBufferSourceNode,
-    public gainNode: GainNode
-  ) {}
+  source: AudioBufferSourceNode;
+  gainNode: GainNode;
+
+  constructor(source: AudioBufferSourceNode, gainNode: GainNode) {
+    this.source = source;
+    this.gainNode = gainNode;
+  }
 }

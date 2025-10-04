@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { X, Plus, Edit2, Trash2, Save } from "lucide-react";
 import { theme } from "../theme";
-import type { Scene, AudioLayer, OneShot } from "../types";
+import type { Scene, AudioLayer } from "../types";
 import { iconMap, oneShotLibrary } from "../mockData";
 
 interface SceneManagerProps {
