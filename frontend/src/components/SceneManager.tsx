@@ -9,9 +9,9 @@ interface SceneManagerProps {
   onClose: () => void;
   scenes: Scene[];
   currentLayers: {
-    environment?: AudioLayer;
-    weather?: AudioLayer;
-    music?: AudioLayer;
+    environment?: AudioLayer | null;
+    weather?: AudioLayer | null;
+    music?: AudioLayer | null;
   };
   onSaveScene: (scene: Scene) => void;
   onDeleteScene: (sceneId: string) => void;
