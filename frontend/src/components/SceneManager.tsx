@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { X, Plus, Edit2, Trash2, Save } from "lucide-react";
 import { theme } from "../theme";
 import type { Scene, AudioLayer } from "../types";
-import { iconMap, oneShotLibrary } from "../mockData";
+import { iconMap } from "../iconMap";
 
 interface SceneManagerProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ interface SceneManagerProps {
     weather?: AudioLayer | null;
     music?: AudioLayer | null;
   };
+  oneShotLibrary: AudioLayer[];
   onSaveScene: (scene: Scene) => void;
   onDeleteScene: (sceneId: string) => void;
 }
@@ -24,6 +25,7 @@ export const SceneManager: React.FC<SceneManagerProps> = ({
   onClose,
   scenes,
   currentLayers,
+  oneShotLibrary,
   onSaveScene,
   onDeleteScene,
 }) => {
@@ -69,9 +71,14 @@ export const SceneManager: React.FC<SceneManagerProps> = ({
   };
 
   const saveScene = () => {
-    const selectedOneShots = oneShotLibrary.filter((os) =>
-      formData.selectedOneShots.includes(os.id)
-    );
+    const selectedOneShots = oneShotLibrary
+      .filter((os) => formData.selectedOneShots.includes(os.id))
+      .map((os) => ({
+        id: os.id,
+        name: os.name,
+        url: os.url,
+        icon: "Volume2", // Generic speaker icon for all one-shots
+      }));
 
     const newScene: Scene = {
       id: editMode === "create" ? `scene-${Date.now()}` : editingScene!.id,
@@ -314,27 +321,33 @@ export const SceneManager: React.FC<SceneManagerProps> = ({
                     One-Shots ({formData.selectedOneShots.length} selected)
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 rounded-lg" style={{ background: theme.bgSoft }}>
-                    {oneShotLibrary.map((oneShot) => {
-                      const isSelected = formData.selectedOneShots.includes(oneShot.id);
-                      const OneShotIcon = iconMap[oneShot.icon];
-                      return (
-                        <button
-                          key={oneShot.id}
-                          onClick={() => toggleOneShot(oneShot.id)}
-                          className="flex items-center gap-2 p-2 rounded-lg text-left transition-all text-sm"
-                          style={{
-                            background: isSelected ? theme.primary : theme.card,
-                            border: isSelected
-                              ? `2px solid ${theme.primary}`
-                              : "1px solid rgba(0, 0, 0, 0.25)",
-                            color: isSelected ? theme.bg : theme.text,
-                          }}
-                        >
-                          <OneShotIcon className="w-4 h-4 flex-shrink-0" />
-                          <span className="truncate">{oneShot.name}</span>
-                        </button>
-                      );
-                    })}
+                    {oneShotLibrary.length === 0 ? (
+                      <div className="col-span-full text-center py-8" style={{ color: theme.textMuted }}>
+                        No one-shot audio files found. Add files to /audio/oneshots/ and rescan.
+                      </div>
+                    ) : (
+                      oneShotLibrary.map((oneShot) => {
+                        const isSelected = formData.selectedOneShots.includes(oneShot.id);
+                        const OneShotIcon = iconMap["Volume2"]; // Generic speaker icon
+                        return (
+                          <button
+                            key={oneShot.id}
+                            onClick={() => toggleOneShot(oneShot.id)}
+                            className="flex items-center gap-2 p-2 rounded-lg text-left transition-all text-sm"
+                            style={{
+                              background: isSelected ? theme.primary : theme.card,
+                              border: isSelected
+                                ? `2px solid ${theme.primary}`
+                                : "1px solid rgba(0, 0, 0, 0.25)",
+                              color: isSelected ? theme.bg : theme.text,
+                            }}
+                          >
+                            <OneShotIcon className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate">{oneShot.name}</span>
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 

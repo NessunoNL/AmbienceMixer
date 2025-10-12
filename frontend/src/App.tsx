@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Music, CloudRain, Trees, Settings2, VolumeX, Volume2 } from "lucide-react";
+import { Music, CloudRain, Trees, Settings2, VolumeX, Volume2, RefreshCw } from "lucide-react";
 import { Section } from "./components/Section";
 import { SceneChip } from "./components/SceneChip";
 import { VerticalFader } from "./components/VerticalFader";
@@ -7,11 +7,12 @@ import { LayerTile } from "./components/LayerTile";
 import { OneShotButton } from "./components/OneShotButton";
 import { LayerPicker } from "./components/LayerPicker";
 import { SceneManager } from "./components/SceneManager";
+import { OneShotPicker } from "./components/OneShotPicker";
 import { AudioEngine } from "./audioEngine";
-import { mockScenes, iconMap } from "./mockData";
+import { iconMap } from "./iconMap";
 import { api } from "./services/api";
 import { theme } from "./theme";
-import type { LayerType, AudioLayer, Scene } from "./types";
+import type { LayerType, AudioLayer, Scene, OneShot } from "./types";
 import type { AudioFile } from "./services/api";
 
 function App() {
@@ -47,6 +48,10 @@ function App() {
   const [mainMuted, setMainMuted] = useState(false);
   const [oneShotVolume, setOneShotVolume] = useState(80);
   const [pickerOpen, setPickerOpen] = useState<LayerType | null>(null);
+  const [oneShotPickerOpen, setOneShotPickerOpen] = useState(false);
+
+  // Track temporary one-shot overrides (not saved to scene)
+  const [temporaryOneShots, setTemporaryOneShots] = useState<OneShot[] | null>(null);
 
   // Track current layer selections (independent of scenes) - load from localStorage
   const [currentLayers, setCurrentLayers] = useState<{
@@ -63,9 +68,9 @@ function App() {
       }
     }
     return {
-      environment: mockScenes[0].environment,
-      weather: mockScenes[0].weather,
-      music: mockScenes[0].music,
+      environment: null,
+      weather: null,
+      music: null,
     };
   });
 
@@ -94,6 +99,8 @@ function App() {
     name: file.name,
     url: api.getAudioStreamUrl(file.id),
     volume: file.volume,
+    duration: file.duration,
+    format: file.format,
   });
 
   // Scene management handlers - now using backend API
@@ -166,21 +173,14 @@ function App() {
 
         // Load scenes from backend
         const backendScenes = await api.getScenes();
+        setScenes(backendScenes);
         if (backendScenes.length > 0) {
-          setScenes(backendScenes);
           setSceneId(backendScenes[0].id);
-        } else {
-          // No scenes in backend, use mock scenes as fallback
-          setScenes(mockScenes);
-          setSceneId(mockScenes[0].id);
         }
 
         setLoading(false);
       } catch (error) {
-        console.error("Failed to load from backend, using mock data:", error);
-        // Fallback to mock data
-        setScenes(mockScenes);
-        setSceneId(mockScenes[0].id);
+        console.error("Failed to load from backend:", error);
         setLoading(false);
       }
     };
@@ -378,6 +378,45 @@ function App() {
     }
   };
 
+  // Handle audio library rescan
+  const handleRescan = async () => {
+    try {
+      setLoading(true);
+      const result = await api.triggerAudioScan();
+      console.log(`Rescan complete: ${result.totalFiles} files indexed in ${result.duration}ms`);
+
+      // Reload library after scan
+      const library = await api.getAudioLibrary();
+      const convertedLibrary = {
+        environment: library.environment.map(convertAudioFile),
+        weather: library.weather.map(convertAudioFile),
+        music: library.music.map(convertAudioFile),
+        oneshots: library.oneshots.map(convertAudioFile),
+      };
+      setAudioLibrary(convertedLibrary);
+      setLoading(false);
+
+      alert(`Audio library rescanned: ${result.totalFiles} files found`);
+    } catch (error) {
+      console.error("Failed to rescan audio library:", error);
+      setLoading(false);
+      alert("Failed to rescan audio library. Check console for details.");
+    }
+  };
+
+  // Handle temporary one-shot customization
+  const handleTemporaryOneShotsApply = (oneShots: OneShot[]) => {
+    setTemporaryOneShots(oneShots);
+  };
+
+  // Clear temporary one-shots
+  const handleClearTemporaryOneShots = () => {
+    setTemporaryOneShots(null);
+  };
+
+  // Get the actual one-shots to display (temporary overrides scene)
+  const displayedOneShots = temporaryOneShots || currentScene?.oneshots || [];
+
   return (
     <div
       className="min-h-screen w-full"
@@ -414,6 +453,27 @@ function App() {
                 {mainMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
               </button>
             )}
+            <button
+              onClick={handleRescan}
+              disabled={loading}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                background: theme.bgSoft,
+                color: theme.accent,
+                border: `1px solid rgba(0, 0, 0, 0.25)`,
+                opacity: loading ? 0.5 : 1,
+                cursor: loading ? "not-allowed" : "pointer",
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) e.currentTarget.style.opacity = "0.8";
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) e.currentTarget.style.opacity = "1";
+              }}
+              title="Rescan audio library"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
+            </button>
           </div>
           {loading ? (
             <p className="text-sm mt-2" style={{ color: theme.textMuted }}>
@@ -480,18 +540,25 @@ function App() {
             </div>
           </div>
           <div className="flex flex-wrap gap-4">
-            {scenes.map((scene) => {
-              const SceneIcon = iconMap[scene.icon];
-              return (
-                <SceneChip
-                  key={scene.id}
-                  icon={SceneIcon}
-                  label={scene.label}
-                  active={scene.id === sceneId}
-                  onClick={() => handleSceneChange(scene.id)}
-                />
-              );
-            })}
+            {scenes.length === 0 ? (
+              <div className="w-full text-center py-8" style={{ color: theme.textMuted }}>
+                <p>No scenes created yet.</p>
+                <p className="text-sm mt-2">Click "Manage" to create your first scene.</p>
+              </div>
+            ) : (
+              scenes.map((scene) => {
+                const SceneIcon = iconMap[scene.icon];
+                return (
+                  <SceneChip
+                    key={scene.id}
+                    icon={SceneIcon}
+                    label={scene.label}
+                    active={scene.id === sceneId}
+                    onClick={() => handleSceneChange(scene.id)}
+                  />
+                );
+              })
+            )}
           </div>
         </Section>
 
@@ -586,6 +653,7 @@ function App() {
           onClose={() => setSceneManagerOpen(false)}
           scenes={scenes}
           currentLayers={currentLayers}
+          oneShotLibrary={audioLibrary.oneshots}
           onSaveScene={handleSaveScene}
           onDeleteScene={handleDeleteScene}
         />
@@ -593,8 +661,51 @@ function App() {
         {/* One-Shots */}
         <Section className="p-3">
           <div className="flex items-center justify-between mb-3">
-            <div className="font-semibold">One‑Shots</div>
             <div className="flex items-center gap-2">
+              <div className="font-semibold">One‑Shots</div>
+              {temporaryOneShots && (
+                <span className="text-xs px-2 py-0.5 rounded" style={{ background: theme.accent, color: theme.bg }}>
+                  Customized
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {temporaryOneShots && (
+                <button
+                  onClick={handleClearTemporaryOneShots}
+                  className="text-xs px-2 py-1 rounded-lg transition-colors"
+                  style={{
+                    background: theme.card,
+                    color: theme.textMuted,
+                    border: `1px solid rgba(0, 0, 0, 0.25)`,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = theme.bgSoft;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = theme.card;
+                  }}
+                >
+                  Reset
+                </button>
+              )}
+              <button
+                onClick={() => setOneShotPickerOpen(true)}
+                className="text-xs px-2 py-1 rounded-lg transition-colors"
+                style={{
+                  background: theme.card,
+                  color: theme.accent,
+                  border: `1px solid rgba(0, 0, 0, 0.25)`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = theme.bgSoft;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = theme.card;
+                }}
+              >
+                Customize
+              </button>
               <span className="text-xs" style={{ color: theme.textMuted }}>
                 Volume
               </span>
@@ -615,19 +726,36 @@ function App() {
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {currentScene?.oneshots.map((oneshot) => {
-              const OneShotIcon = iconMap[oneshot.icon];
-              return (
-                <OneShotButton
-                  key={oneshot.id}
-                  name={oneshot.name}
-                  icon={OneShotIcon}
-                  onTrigger={() => handleOneShotTrigger(oneshot.url)}
-                />
-              );
-            })}
+            {displayedOneShots.length === 0 ? (
+              <div className="col-span-full text-center py-8" style={{ color: theme.textMuted }}>
+                <p>No one-shots available for this scene.</p>
+                <p className="text-sm mt-2">Click "Customize" to add some.</p>
+              </div>
+            ) : (
+              displayedOneShots.map((oneshot) => {
+                const OneShotIcon = iconMap[oneshot.icon];
+                return (
+                  <OneShotButton
+                    key={oneshot.id}
+                    name={oneshot.name}
+                    icon={OneShotIcon}
+                    onTrigger={() => handleOneShotTrigger(oneshot.url)}
+                  />
+                );
+              })
+            )}
           </div>
         </Section>
+
+        {/* One-Shot Picker */}
+        <OneShotPicker
+          isOpen={oneShotPickerOpen}
+          onClose={() => setOneShotPickerOpen(false)}
+          availableOneShots={audioLibrary.oneshots}
+          currentSelection={displayedOneShots}
+          onApply={handleTemporaryOneShotsApply}
+          temporary={true}
+        />
         </>
         )}
       </main>

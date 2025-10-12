@@ -3,18 +3,80 @@ import db from '../services/database.js';
 
 const router = express.Router();
 
+// Helper function to hydrate scene with full audio layer objects
+function hydrateScene(scene) {
+  const hydrated = { ...scene };
+
+  // Hydrate environment layer
+  if (scene.environment_id) {
+    const envAudio = db.getAudioFileById(scene.environment_id);
+    if (envAudio) {
+      hydrated.environment = {
+        id: envAudio.id.toString(),
+        name: envAudio.name,
+        url: `/api/audio/${envAudio.id}/stream`,
+        volume: 0.7,
+      };
+    }
+  }
+
+  // Hydrate weather layer
+  if (scene.weather_id) {
+    const weatherAudio = db.getAudioFileById(scene.weather_id);
+    if (weatherAudio) {
+      hydrated.weather = {
+        id: weatherAudio.id.toString(),
+        name: weatherAudio.name,
+        url: `/api/audio/${weatherAudio.id}/stream`,
+        volume: 0.7,
+      };
+    }
+  }
+
+  // Hydrate music layer
+  if (scene.music_id) {
+    const musicAudio = db.getAudioFileById(scene.music_id);
+    if (musicAudio) {
+      hydrated.music = {
+        id: musicAudio.id.toString(),
+        name: musicAudio.name,
+        url: `/api/audio/${musicAudio.id}/stream`,
+        volume: 0.7,
+      };
+    }
+  }
+
+  // Hydrate one-shots
+  const oneShotIds = scene.oneshots ? JSON.parse(scene.oneshots) : [];
+  hydrated.oneshots = oneShotIds.map(id => {
+    const audio = db.getAudioFileById(parseInt(id));
+    if (audio) {
+      return {
+        id: audio.id.toString(),
+        name: audio.name,
+        url: `/api/audio/${audio.id}/stream`,
+        icon: 'Volume2', // Generic speaker icon
+      };
+    }
+    return null;
+  }).filter(os => os !== null);
+
+  // Remove database-specific fields
+  delete hydrated.environment_id;
+  delete hydrated.weather_id;
+  delete hydrated.music_id;
+  delete hydrated.created_at;
+  delete hydrated.updated_at;
+
+  return hydrated;
+}
+
 // Get all scenes
 router.get('/', (req, res) => {
   try {
     const scenes = db.getAllScenes();
-
-    // Parse oneshots JSON for each scene
-    const parsedScenes = scenes.map(scene => ({
-      ...scene,
-      oneshots: scene.oneshots ? JSON.parse(scene.oneshots) : [],
-    }));
-
-    res.json(parsedScenes);
+    const hydratedScenes = scenes.map(hydrateScene);
+    res.json(hydratedScenes);
   } catch (err) {
     console.error('Error fetching scenes:', err);
     res.status(500).json({ error: 'Failed to fetch scenes' });
@@ -29,10 +91,8 @@ router.get('/:id', (req, res) => {
       return res.status(404).json({ error: 'Scene not found' });
     }
 
-    res.json({
-      ...scene,
-      oneshots: scene.oneshots ? JSON.parse(scene.oneshots) : [],
-    });
+    const hydratedScene = hydrateScene(scene);
+    res.json(hydratedScene);
   } catch (err) {
     console.error('Error fetching scene:', err);
     res.status(500).json({ error: 'Failed to fetch scene' });

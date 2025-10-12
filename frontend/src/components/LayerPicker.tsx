@@ -212,13 +212,24 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
                     <div className="flex-1">
                       <div className="font-medium">{item.name}</div>
                       <div
-                        className="text-xs mt-0.5"
+                        className="text-xs mt-0.5 space-y-0.5"
                         style={{
                           color: isSelected ? theme.bg : theme.textMuted,
                           opacity: 0.8,
                         }}
                       >
-                        {isSelected ? "Currently playing" : "Click to select"}
+                        <div className="flex gap-2">
+                          {item.duration && (
+                            <span>
+                              {Math.floor(item.duration / 60)}:
+                              {Math.floor(item.duration % 60)
+                                .toString()
+                                .padStart(2, "0")}
+                            </span>
+                          )}
+                          {item.format && <span>• {item.format.toUpperCase()}</span>}
+                        </div>
+                        <div>{isSelected ? "Currently playing" : "Click to select"}</div>
                       </div>
                     </div>
                   </button>

@@ -4,6 +4,8 @@ export interface AudioLayer {
   name: string;
   thumb?: string;
   volume: number;
+  duration?: number;
+  format?: string;
 }
 
 export interface Scene {
