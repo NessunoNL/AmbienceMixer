@@ -4,6 +4,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import audioRouter from './routes/audio.js';
 import scenesRouter from './routes/scenes.js';
+import migrateRouter from './routes/migrate.js';
 import audioScanner from './services/audioScanner.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -26,6 +27,7 @@ app.use((req, res, next) => {
 // API routes
 app.use('/api/audio', audioRouter);
 app.use('/api/scenes', scenesRouter);
+app.use('/api/migrate', migrateRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

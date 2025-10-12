@@ -63,8 +63,8 @@ class DatabaseService {
 
   insertScene(scene) {
     const stmt = this.db.prepare(`
-      INSERT INTO scenes (id, label, icon, environment_id, weather_id, music_id, oneshots)
-      VALUES (@id, @label, @icon, @environment_id, @weather_id, @music_id, @oneshots)
+      INSERT INTO scenes (id, label, icon, environment_id, weather_id, music_id, oneshots, environment_volume, weather_volume, music_volume)
+      VALUES (@id, @label, @icon, @environment_id, @weather_id, @music_id, @oneshots, @environment_volume, @weather_volume, @music_volume)
     `);
     return stmt.run(scene);
   }
@@ -78,6 +78,9 @@ class DatabaseService {
           weather_id = @weather_id,
           music_id = @music_id,
           oneshots = @oneshots,
+          environment_volume = @environment_volume,
+          weather_volume = @weather_volume,
+          music_volume = @music_volume,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = @id
     `);
