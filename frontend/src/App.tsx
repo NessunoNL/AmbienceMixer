@@ -117,7 +117,12 @@ function App() {
         weather_id: scene.weather?.id ? parseInt(scene.weather.id) : null,
         music_id: scene.music?.id ? parseInt(scene.music.id) : null,
         oneshots: scene.oneshots.map(os => parseInt(os.id)),
+        environmentVolume: scene.environmentVolume,
+        weatherVolume: scene.weatherVolume,
+        musicVolume: scene.musicVolume,
       };
+
+      console.log('[App] Saving scene to backend:', { id: scene.id, label: scene.label, volumes: { env: scene.environmentVolume, weather: scene.weatherVolume, music: scene.musicVolume } });
 
       if (existingIndex >= 0) {
         // Update existing scene
@@ -242,11 +247,60 @@ function App() {
     }
   };
 
+  // Animate volume changes over time
+  const animateVolume = (
+    layer: LayerType,
+    fromValue: number,
+    toValue: number,
+    duration: number
+  ) => {
+    const startTime = performance.now();
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / (duration * 1000), 1);
+
+      // Ease-in-out function for smooth animation
+      const easeProgress = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      const currentValue = Math.round(fromValue + (toValue - fromValue) * easeProgress);
+
+      // Update both UI state and audio engine
+      setVolumes((prev) => ({ ...prev, [layer]: currentValue }));
+
+      if (audioEngineRef.current && !muted[layer]) {
+        audioEngineRef.current.setVolume(layer, currentValue / 100, 0);
+      }
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        console.log(`[Volume Animation] ${layer} completed: ${fromValue} → ${toValue}`);
+      }
+    };
+
+    console.log(`[Volume Animation] Starting ${layer}: ${fromValue} → ${toValue} over ${duration}s`);
+    requestAnimationFrame(animate);
+  };
+
   // Handle scene change
   const handleSceneChange = (newSceneId: string) => {
     setSceneId(newSceneId);
     const newScene = scenes.find((s) => s.id === newSceneId);
     if (!newScene) return;
+
+    console.log('[Scene Change] Loading scene:', {
+      id: newScene.id,
+      label: newScene.label,
+      savedVolumes: {
+        env: newScene.environmentVolume,
+        weather: newScene.weatherVolume,
+        music: newScene.musicVolume
+      },
+      currentVolumes: volumes
+    });
 
     // Update current layers to match scene
     setCurrentLayers({
@@ -254,6 +308,17 @@ function App() {
       weather: newScene.weather,
       music: newScene.music,
     });
+
+    // Animate volume changes if scene has saved volumes
+    if (newScene.environmentVolume !== undefined) {
+      animateVolume("environment", volumes.environment, newScene.environmentVolume, 6);
+    }
+    if (newScene.weatherVolume !== undefined) {
+      animateVolume("weather", volumes.weather, newScene.weatherVolume, 6);
+    }
+    if (newScene.musicVolume !== undefined) {
+      animateVolume("music", volumes.music, newScene.musicVolume, 6);
+    }
 
     if (audioInitialized) {
       loadScene(newScene);
@@ -690,6 +755,7 @@ function App() {
           onClose={() => setSceneManagerOpen(false)}
           scenes={scenes}
           currentLayers={currentLayers}
+          currentVolumes={volumes}
           oneShotLibrary={audioLibrary.oneshots}
           onSaveScene={handleSaveScene}
           onDeleteScene={handleDeleteScene}

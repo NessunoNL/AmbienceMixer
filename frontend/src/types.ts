@@ -16,6 +16,9 @@ export interface Scene {
   weather?: AudioLayer;
   music?: AudioLayer;
   oneshots: OneShot[];
+  environmentVolume?: number;
+  weatherVolume?: number;
+  musicVolume?: number;
 }
 
 export interface OneShot {

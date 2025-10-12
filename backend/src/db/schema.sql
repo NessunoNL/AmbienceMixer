@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS scenes (
   weather_id INTEGER,
   music_id INTEGER,
   oneshots TEXT, -- JSON array of oneshot IDs
+  environment_volume INTEGER DEFAULT 70,
+  weather_volume INTEGER DEFAULT 45,
+  music_volume INTEGER DEFAULT 60,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (environment_id) REFERENCES audio_files(id) ON DELETE SET NULL,

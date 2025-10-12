@@ -13,6 +13,11 @@ interface SceneManagerProps {
     weather?: AudioLayer | null;
     music?: AudioLayer | null;
   };
+  currentVolumes: {
+    environment: number;
+    weather: number;
+    music: number;
+  };
   oneShotLibrary: AudioLayer[];
   onSaveScene: (scene: Scene) => void;
   onDeleteScene: (sceneId: string) => void;
@@ -25,6 +30,7 @@ export const SceneManager: React.FC<SceneManagerProps> = ({
   onClose,
   scenes,
   currentLayers,
+  currentVolumes,
   oneShotLibrary,
   onSaveScene,
   onDeleteScene,
@@ -88,7 +94,20 @@ export const SceneManager: React.FC<SceneManagerProps> = ({
       weather: currentLayers.weather || undefined,
       music: currentLayers.music || undefined,
       oneshots: selectedOneShots,
+      environmentVolume: currentVolumes.environment,
+      weatherVolume: currentVolumes.weather,
+      musicVolume: currentVolumes.music,
     };
+
+    console.log('[SceneManager] Saving scene with volumes:', {
+      id: newScene.id,
+      label: newScene.label,
+      volumes: {
+        env: newScene.environmentVolume,
+        weather: newScene.weatherVolume,
+        music: newScene.musicVolume
+      }
+    });
 
     onSaveScene(newScene);
     cancelEdit();
