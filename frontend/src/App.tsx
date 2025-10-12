@@ -257,7 +257,8 @@ function App() {
     layer: LayerType,
     fromValue: number,
     toValue: number,
-    duration: number
+    duration: number,
+    isMuteOperation = false
   ) => {
     const startTime = performance.now();
     let lastStateUpdate = startTime;
@@ -280,9 +281,8 @@ function App() {
         lastStateUpdate = currentTime;
       }
 
-      // Update audio engine for smooth audio (skip during mute/unmute as audio has its own fade)
-      // Only update if not in the middle of a mute/unmute transition
-      if (audioEngineRef.current && !muted[layer] && currentValue > 0) {
+      // Update audio engine (skip during mute/unmute as audio has its own separate fade)
+      if (!isMuteOperation && audioEngineRef.current) {
         audioEngineRef.current.setVolume(layer, currentValue / 100, 0);
       }
 
@@ -446,12 +446,12 @@ function App() {
         setPreMuteVolumes((prev) => ({ ...prev, [layer]: volumes[layer] }));
 
         // Animate slider to 0 and fade audio over 2 seconds
-        animateVolume(layer, volumes[layer], 0, 2);
+        animateVolume(layer, volumes[layer], 0, 2, true);
         audioEngineRef.current.setVolume(layer, 0, 2);
       } else {
         // Animate slider back to pre-mute volume over 2 seconds
         const targetVolume = preMuteVolumes[layer];
-        animateVolume(layer, 0, targetVolume, 2);
+        animateVolume(layer, 0, targetVolume, 2, true);
         audioEngineRef.current.setVolume(layer, targetVolume / 100, 2);
       }
     }
