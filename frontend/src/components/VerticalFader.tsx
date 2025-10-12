@@ -33,13 +33,14 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
     onChange(Math.round(newValue));
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
+  const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -5 : 5; // Scroll down = decrease, scroll up = increase
     const newValue = Math.max(0, Math.min(100, value + delta));
     onChange(newValue);
   };
 
+  // Handle mouse drag
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDragging) handleMove(e.clientY);
@@ -57,6 +58,18 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
     }
   }, [isDragging]);
 
+  // Handle wheel events with passive: false to allow preventDefault
+  useEffect(() => {
+    const trackElement = trackRef.current?.parentElement;
+    if (!trackElement) return;
+
+    trackElement.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      trackElement.removeEventListener("wheel", handleWheel);
+    };
+  }, [value, onChange]);
+
   return (
     <div
       className="flex flex-col items-center gap-3 p-4 rounded-2xl"
@@ -72,7 +85,6 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
       </div>
       <div
         className="relative h-56 w-12 flex items-center justify-center"
-        onWheel={handleWheel}
       >
         <div
           ref={trackRef}
