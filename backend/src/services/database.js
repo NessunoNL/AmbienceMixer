@@ -50,6 +50,11 @@ class DatabaseService {
     return stmt.run();
   }
 
+  deleteAudioFileByPath(path) {
+    const stmt = this.db.prepare('DELETE FROM audio_files WHERE path = ?');
+    return stmt.run(path);
+  }
+
   // Scenes methods
   getAllScenes() {
     const stmt = this.db.prepare('SELECT * FROM scenes ORDER BY created_at DESC');

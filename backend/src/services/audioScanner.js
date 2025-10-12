@@ -11,8 +11,9 @@ class AudioScanner {
     console.log(`🔍 Scanning audio directory: ${AUDIO_DIR}`);
     const startTime = Date.now();
 
-    // Clear existing entries
-    db.deleteAllAudioFiles();
+    // Note: Using UPSERT to preserve IDs - scenes remain valid after rescans
+    // Track scanned paths to identify deleted files
+    const scannedPaths = new Set();
 
     const categories = ['environment', 'weather', 'music', 'oneshots'];
     let totalFiles = 0;
@@ -35,8 +36,9 @@ class AudioScanner {
             const stats = statSync(filePath);
             const metadata = await this.extractMetadata(filePath);
 
+            const audioPath = `/audio/${category}/${file}`;
             const audioData = {
-              path: `/audio/${category}/${file}`,
+              path: audioPath,
               name: this.formatFileName(basename(file, ext)),
               category,
               duration: metadata.duration || null,
@@ -45,6 +47,7 @@ class AudioScanner {
             };
 
             db.insertAudioFile(audioData);
+            scannedPaths.add(audioPath);
             totalFiles++;
             console.log(`  ✓ ${category}/${file}`);
           } catch (err) {
@@ -56,10 +59,21 @@ class AudioScanner {
       }
     }
 
-    const duration = Date.now() - startTime;
-    console.log(`✓ Scan complete: ${totalFiles} files indexed in ${duration}ms`);
+    // Remove files from database that no longer exist on filesystem
+    const existingFiles = db.getAllAudioFiles();
+    let deletedCount = 0;
+    for (const file of existingFiles) {
+      if (!scannedPaths.has(file.path)) {
+        db.deleteAudioFileByPath(file.path);
+        deletedCount++;
+        console.log(`  🗑 Removed: ${file.path}`);
+      }
+    }
 
-    return { totalFiles, duration };
+    const duration = Date.now() - startTime;
+    console.log(`✓ Scan complete: ${totalFiles} files indexed, ${deletedCount} removed in ${duration}ms`);
+
+    return { totalFiles, deletedCount, duration };
   }
 
   async extractMetadata(filePath) {
