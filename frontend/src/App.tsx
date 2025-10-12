@@ -45,6 +45,11 @@ function App() {
     weather: false,
     music: false,
   });
+  const [preMuteVolumes, setPreMuteVolumes] = useState({
+    environment: 70,
+    weather: 45,
+    music: 60,
+  });
   const [mainMuted, setMainMuted] = useState(false);
   const [oneShotVolume, setOneShotVolume] = useState(80);
   const [pickerOpen, setPickerOpen] = useState<LayerType | null>(null);
@@ -247,7 +252,7 @@ function App() {
     }
   };
 
-  // Animate volume changes over time
+  // Animate volume changes over time (optimized with batched updates)
   const animateVolume = (
     layer: LayerType,
     fromValue: number,
@@ -255,6 +260,8 @@ function App() {
     duration: number
   ) => {
     const startTime = performance.now();
+    let lastStateUpdate = startTime;
+    const STATE_UPDATE_INTERVAL = 50; // Update React state every 50ms for smooth visuals
 
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
@@ -267,10 +274,15 @@ function App() {
 
       const currentValue = Math.round(fromValue + (toValue - fromValue) * easeProgress);
 
-      // Update both UI state and audio engine
-      setVolumes((prev) => ({ ...prev, [layer]: currentValue }));
+      // Update React state every 50ms (not every frame) for smooth rendering without performance hit
+      if (currentTime - lastStateUpdate >= STATE_UPDATE_INTERVAL || progress >= 1) {
+        setVolumes((prev) => ({ ...prev, [layer]: currentValue }));
+        lastStateUpdate = currentTime;
+      }
 
-      if (audioEngineRef.current && !muted[layer]) {
+      // Update audio engine for smooth audio (skip during mute/unmute as audio has its own fade)
+      // Only update if not in the middle of a mute/unmute transition
+      if (audioEngineRef.current && !muted[layer] && currentValue > 0) {
         audioEngineRef.current.setVolume(layer, currentValue / 100, 0);
       }
 
@@ -423,18 +435,24 @@ function App() {
     }
   };
 
-  // Handle mute toggle
+  // Handle mute toggle with 2-second animated transition
   const handleMuteToggle = (layer: LayerType) => {
     const newMutedState = !muted[layer];
     setMuted((prev) => ({ ...prev, [layer]: newMutedState }));
 
     if (audioEngineRef.current && audioInitialized) {
       if (newMutedState) {
-        // Fade to 0 when muting
-        audioEngineRef.current.setVolume(layer, 0, 0.3);
+        // Save current volume before muting
+        setPreMuteVolumes((prev) => ({ ...prev, [layer]: volumes[layer] }));
+
+        // Animate slider to 0 and fade audio over 2 seconds
+        animateVolume(layer, volumes[layer], 0, 2);
+        audioEngineRef.current.setVolume(layer, 0, 2);
       } else {
-        // Fade back to current volume when unmuting
-        audioEngineRef.current.setVolume(layer, volumes[layer] / 100, 0.3);
+        // Animate slider back to pre-mute volume over 2 seconds
+        const targetVolume = preMuteVolumes[layer];
+        animateVolume(layer, 0, targetVolume, 2);
+        audioEngineRef.current.setVolume(layer, targetVolume / 100, 2);
       }
     }
   };

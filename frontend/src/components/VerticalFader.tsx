@@ -107,7 +107,7 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
               transform: "translate(-50%, -50%)",
               background: theme.primary,
               boxShadow: "0 6px 14px rgba(0,0,0,0.35), inset 0 0 0 2px rgba(255,255,255,0.15)",
-              transition: isDragging ? "none" : "top 0.05s ease-out",
+              transition: isDragging ? "none" : "top 0.1s ease-out",
             }}
           />
         </div>
