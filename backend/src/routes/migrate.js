@@ -5,40 +5,60 @@ const router = express.Router();
 
 // One-time migration endpoint to add volume columns
 router.post('/add-volume-columns', (req, res) => {
-  try {
-    console.log('[Migration] Starting: adding volume columns to scenes table');
+  console.log('[Migration] Starting: checking for volume columns in scenes table');
 
-    // Check if columns already exist
-    const testQuery = db.db.prepare('SELECT environment_volume FROM scenes LIMIT 1');
-    try {
-      testQuery.get();
+  try {
+    // Check if columns exist using PRAGMA table_info
+    const columns = db.db.prepare('PRAGMA table_info(scenes)').all();
+    const columnNames = columns.map(col => col.name);
+
+    console.log('[Migration] Existing columns:', columnNames);
+
+    const hasEnvironmentVolume = columnNames.includes('environment_volume');
+    const hasWeatherVolume = columnNames.includes('weather_volume');
+    const hasMusicVolume = columnNames.includes('music_volume');
+
+    if (hasEnvironmentVolume && hasWeatherVolume && hasMusicVolume) {
+      console.log('[Migration] All volume columns already exist');
       return res.json({
         success: true,
         message: 'Volume columns already exist',
         alreadyExists: true
       });
-    } catch (err) {
-      // Columns don't exist, add them
+    }
+
+    // Add missing columns
+    const columnsAdded = [];
+
+    if (!hasEnvironmentVolume) {
       console.log('[Migration] Adding environment_volume column...');
       db.db.exec('ALTER TABLE scenes ADD COLUMN environment_volume INTEGER DEFAULT 70');
+      columnsAdded.push('environment_volume');
+    }
 
+    if (!hasWeatherVolume) {
       console.log('[Migration] Adding weather_volume column...');
       db.db.exec('ALTER TABLE scenes ADD COLUMN weather_volume INTEGER DEFAULT 45');
+      columnsAdded.push('weather_volume');
+    }
 
+    if (!hasMusicVolume) {
       console.log('[Migration] Adding music_volume column...');
       db.db.exec('ALTER TABLE scenes ADD COLUMN music_volume INTEGER DEFAULT 60');
-
-      console.log('[Migration] Complete: volume columns added successfully');
-
-      return res.json({
-        success: true,
-        message: 'Volume columns added successfully',
-        columnsAdded: ['environment_volume', 'weather_volume', 'music_volume']
-      });
+      columnsAdded.push('music_volume');
     }
+
+    console.log('[Migration] Complete: added', columnsAdded.join(', '));
+
+    return res.json({
+      success: true,
+      message: `Added ${columnsAdded.length} volume column(s)`,
+      columnsAdded
+    });
+
   } catch (err) {
     console.error('[Migration] Error:', err);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Migration failed',
       details: err.message
