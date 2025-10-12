@@ -51,7 +51,7 @@ class ApiClient {
     return response.json();
   }
 
-  async createScene(scene: Omit<Scene, "oneshots"> & { oneshots: string[] }): Promise<{ success: boolean; id: string }> {
+  async createScene(scene: Omit<Scene, "oneshots"> & { oneshots: number[] }): Promise<{ success: boolean; id: string }> {
     const response = await fetch(`${API_BASE}/scenes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -63,7 +63,7 @@ class ApiClient {
     return response.json();
   }
 
-  async updateScene(id: string, scene: Partial<Omit<Scene, "id" | "oneshots"> & { oneshots: string[] }>): Promise<{ success: boolean; id: string }> {
+  async updateScene(id: string, scene: Partial<Omit<Scene, "id" | "oneshots"> & { oneshots: number[] }>): Promise<{ success: boolean; id: string }> {
     const response = await fetch(`${API_BASE}/scenes/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
