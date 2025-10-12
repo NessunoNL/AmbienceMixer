@@ -113,9 +113,9 @@ function App() {
         id: scene.id,
         label: scene.label,
         icon: scene.icon,
-        environment_id: scene.environment ? parseInt(scene.environment.id) : null,
-        weather_id: scene.weather ? parseInt(scene.weather.id) : null,
-        music_id: scene.music ? parseInt(scene.music.id) : null,
+        environment_id: scene.environment?.id ? parseInt(scene.environment.id) : null,
+        weather_id: scene.weather?.id ? parseInt(scene.weather.id) : null,
+        music_id: scene.music?.id ? parseInt(scene.music.id) : null,
         oneshots: scene.oneshots.map(os => parseInt(os.id)),
       };
 
