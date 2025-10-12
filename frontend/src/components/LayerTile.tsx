@@ -1,4 +1,5 @@
 import React from "react";
+import { CornerDownRight } from "lucide-react";
 import { theme } from "../theme";
 
 interface LayerTileProps {
@@ -9,6 +10,7 @@ interface LayerTileProps {
   defaultDuration: number;
   onPick?: () => void;
   onDurationChange?: (duration: number) => void;
+  onSwitchLayer?: () => void;
 }
 
 export const LayerTile: React.FC<LayerTileProps> = ({
@@ -18,7 +20,8 @@ export const LayerTile: React.FC<LayerTileProps> = ({
   queued,
   defaultDuration,
   onPick,
-  onDurationChange
+  onDurationChange,
+  onSwitchLayer
 }) => {
   const hasQueuedValue = queued !== undefined;
   const isQueuedNull = queued?.layer === null;
@@ -31,7 +34,7 @@ export const LayerTile: React.FC<LayerTileProps> = ({
 
   return (
     <div
-      className="rounded-xl w-full transition-colors"
+      className="rounded-xl w-full transition-colors relative"
       style={{
         background: theme.card,
         border: hasQueuedValue ? `2px solid ${theme.accent}` : `1px solid rgba(0,0,0,0.25)`,
@@ -39,6 +42,29 @@ export const LayerTile: React.FC<LayerTileProps> = ({
         boxShadow: "0 4px 10px rgba(0,0,0,0.35)",
       }}
     >
+      {/* Individual Switch Button */}
+      {hasQueuedValue && onSwitchLayer && (
+        <button
+          onClick={onSwitchLayer}
+          className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all z-10"
+          style={{
+            background: theme.accent,
+            color: theme.bg,
+            border: `2px solid ${theme.card}`,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "scale(1.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+          title={`Switch ${label.toLowerCase()} now`}
+        >
+          <CornerDownRight className="w-4 h-4" />
+        </button>
+      )}
+
       <button
         onClick={onPick}
         className="flex items-center gap-3 p-3 w-full transition-colors"

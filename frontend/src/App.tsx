@@ -316,6 +316,40 @@ function App() {
     }
   };
 
+  // Handle individual layer switch
+  const handleIndividualLayerSwitch = async (layer: LayerType) => {
+    if (!audioEngineRef.current || !audioInitialized) return;
+
+    const queuedItem = queuedLayers[layer];
+    if (!queuedItem) return;
+
+    try {
+      // If layer is null, stop the layer (silence) with user-selected duration
+      if (queuedItem.layer === null) {
+        await audioEngineRef.current.stopLayer(layer, true, queuedItem.duration);
+      } else {
+        await audioEngineRef.current.loadLayer(
+          layer,
+          queuedItem.layer.url,
+          muted[layer] ? 0 : volumes[layer] / 100,
+          queuedItem.duration
+        );
+      }
+
+      // Update current layer
+      setCurrentLayers((prev) => ({ ...prev, [layer]: queuedItem.layer }));
+
+      // Remove this layer from queue
+      setQueuedLayers((prev) => {
+        const updated = { ...prev };
+        delete updated[layer];
+        return updated;
+      });
+    } catch (error) {
+      console.error(`Failed to switch ${layer} layer:`, error);
+    }
+  };
+
   // Handle volume change
   const handleVolumeChange = (layer: LayerType, value: number) => {
     setVolumes((prev) => ({ ...prev, [layer]: value }));
@@ -600,6 +634,7 @@ function App() {
             defaultDuration={defaultCrossfadeDurations.environment}
             onPick={() => setPickerOpen("environment")}
             onDurationChange={(duration) => handleDurationChange("environment", duration)}
+            onSwitchLayer={() => handleIndividualLayerSwitch("environment")}
           />
           <LayerTile
             label="Weather"
@@ -609,6 +644,7 @@ function App() {
             defaultDuration={defaultCrossfadeDurations.weather}
             onPick={() => setPickerOpen("weather")}
             onDurationChange={(duration) => handleDurationChange("weather", duration)}
+            onSwitchLayer={() => handleIndividualLayerSwitch("weather")}
           />
           <LayerTile
             label="Music"
@@ -618,6 +654,7 @@ function App() {
             defaultDuration={defaultCrossfadeDurations.music}
             onPick={() => setPickerOpen("music")}
             onDurationChange={(duration) => handleDurationChange("music", duration)}
+            onSwitchLayer={() => handleIndividualLayerSwitch("music")}
           />
         </section>
 

@@ -166,14 +166,6 @@ export class AudioEngine {
 
   async playOneShot(url: string, volume: number = 0.8): Promise<void> {
     try {
-      // Duck music layer
-      const musicLayer = this.layers.get("music");
-      const originalMusicVolume = musicLayer?.gainNode.gain.value ?? 0;
-
-      if (musicLayer) {
-        await this.crossfadeLayer("music", originalMusicVolume * 0.3, 200);
-      }
-
       // Play one-shot
       const response = await fetch(url);
       const arrayBuffer = await response.arrayBuffer();
@@ -189,13 +181,6 @@ export class AudioEngine {
       gainNode.connect(this.masterGain);
 
       source.start(0);
-
-      // Restore music after one-shot finishes
-      source.onended = async () => {
-        if (musicLayer) {
-          await this.crossfadeLayer("music", originalMusicVolume, 500);
-        }
-      };
     } catch (error) {
       console.error("Failed to play one-shot:", error);
     }
