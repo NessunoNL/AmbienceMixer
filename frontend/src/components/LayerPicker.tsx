@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { X, Music, Shuffle, Tag as TagIcon, Plus, Check } from "lucide-react";
+import { X, Music, Shuffle, Tag as TagIcon, Plus } from "lucide-react";
 import { theme } from "../theme";
 import type { AudioLayer, LayerType, MusicTag } from "../types";
 import { api } from "../services/api";
