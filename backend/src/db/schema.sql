@@ -54,7 +54,3 @@ CREATE TABLE IF NOT EXISTS audio_file_tags (
 
 CREATE INDEX IF NOT EXISTS idx_audio_file_tags_audio ON audio_file_tags(audio_file_id);
 CREATE INDEX IF NOT EXISTS idx_audio_file_tags_tag ON audio_file_tags(tag_id);
-
--- Add music playback mode to scenes (single-loop or tag-shuffle)
-ALTER TABLE scenes ADD COLUMN music_mode TEXT DEFAULT 'single-loop' CHECK(music_mode IN ('single-loop', 'tag-shuffle'));
-ALTER TABLE scenes ADD COLUMN music_tag_id INTEGER REFERENCES music_tags(id) ON DELETE SET NULL;

@@ -18,7 +18,29 @@ class DatabaseService {
   initialize() {
     const schema = readFileSync(join(__dirname, '../db/schema.sql'), 'utf8');
     this.db.exec(schema);
+
+    // Run migrations
+    this.runMigrations();
+
     console.log('✓ Database initialized');
+  }
+
+  runMigrations() {
+    // Check if music_mode column exists
+    const scenesInfo = this.db.pragma('table_info(scenes)');
+    const hasMusicMode = scenesInfo.some(col => col.name === 'music_mode');
+    const hasMusicTagId = scenesInfo.some(col => col.name === 'music_tag_id');
+
+    // Add music playback columns if they don't exist
+    if (!hasMusicMode) {
+      console.log('  ✓ Adding music_mode column to scenes');
+      this.db.exec(`ALTER TABLE scenes ADD COLUMN music_mode TEXT DEFAULT 'single-loop' CHECK(music_mode IN ('single-loop', 'tag-shuffle'))`);
+    }
+
+    if (!hasMusicTagId) {
+      console.log('  ✓ Adding music_tag_id column to scenes');
+      this.db.exec(`ALTER TABLE scenes ADD COLUMN music_tag_id INTEGER REFERENCES music_tags(id) ON DELETE SET NULL`);
+    }
   }
 
   // Audio files methods
