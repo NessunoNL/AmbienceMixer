@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from "react";
-import { X, Music, Shuffle } from "lucide-react";
+import React, { useState, useMemo, useEffect } from "react";
+import { X, Music, Shuffle, Tag as TagIcon, Plus, Check } from "lucide-react";
 import { theme } from "../theme";
 import type { AudioLayer, LayerType, MusicTag } from "../types";
+import { api } from "../services/api";
 
 interface LayerPickerProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface LayerPickerProps {
   currentSelection?: AudioLayer | null;
   onSelect: (item: AudioLayer | null) => void;
   onSelectTag?: (tag: MusicTag) => void;
+  onTagsUpdated?: () => void;
 }
 
 export const LayerPicker: React.FC<LayerPickerProps> = ({
@@ -21,9 +23,13 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
   currentSelection,
   onSelect,
   onSelectTag,
+  onTagsUpdated,
 }) => {
   const [selectedTagFilter, setSelectedTagFilter] = useState<number | null>(null);
   const [musicPickerMode, setMusicPickerMode] = useState<"single" | "tag">("single");
+  const [openTagDropdown, setOpenTagDropdown] = useState<string | null>(null);
+  const [allAvailableTags, setAllAvailableTags] = useState<MusicTag[]>([]);
+  const [newTagInput, setNewTagInput] = useState("");
 
   // Extract all unique tags from music items
   const allTags = useMemo(() => {
@@ -44,6 +50,57 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
     }
     return items.filter((item) => item.tags?.some((tag) => tag.id === selectedTagFilter));
   }, [items, selectedTagFilter, layerType]);
+
+  // Load all tags when picker opens (for music only)
+  useEffect(() => {
+    if (isOpen && layerType === "music") {
+      loadAllTags();
+    }
+  }, [isOpen, layerType]);
+
+  const loadAllTags = async () => {
+    try {
+      const tags = await api.getAllMusicTags();
+      setAllAvailableTags(tags);
+    } catch (error) {
+      console.error("Failed to load tags:", error);
+    }
+  };
+
+  // Handle tag toggle
+  const handleToggleTag = async (fileId: string, tagId: number, hasTag: boolean) => {
+    try {
+      if (hasTag) {
+        await api.removeTagFromAudioFile(parseInt(fileId), tagId);
+      } else {
+        await api.addTagToAudioFile(parseInt(fileId), tagId);
+      }
+      if (onTagsUpdated) {
+        onTagsUpdated();
+      }
+      await loadAllTags();
+    } catch (error) {
+      console.error("Failed to toggle tag:", error);
+    }
+  };
+
+  // Handle inline tag creation
+  const handleCreateAndAssignTag = async (fileId: string) => {
+    if (!newTagInput.trim()) return;
+
+    try {
+      const result = await api.createMusicTag(newTagInput.trim());
+      await api.addTagToAudioFile(parseInt(fileId), result.tag.id);
+      setNewTagInput("");
+      if (onTagsUpdated) {
+        onTagsUpdated();
+      }
+      await loadAllTags();
+    } catch (error) {
+      console.error("Failed to create and assign tag:", error);
+      alert("Failed to create tag. It may already exist.");
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -299,14 +356,11 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
 
               {filteredItems.map((item) => {
                 const isSelected = currentSelection?.id === item.id;
+                const isDropdownOpen = openTagDropdown === item.id;
                 return (
-                  <button
+                  <div
                     key={item.id}
-                    onClick={() => {
-                      onSelect(item);
-                      onClose();
-                    }}
-                    className="flex items-center gap-3 p-3 rounded-xl transition-all text-left"
+                    className="relative rounded-xl transition-all"
                     style={{
                       background: isSelected ? theme.primary : theme.card,
                       border: isSelected
@@ -330,75 +384,185 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
                       }
                     }}
                   >
-                    <div
-                      className="w-12 h-12 rounded-lg flex items-center justify-center"
-                      style={{
-                        background: isSelected
-                          ? "rgba(0, 0, 0, 0.2)"
-                          : theme.bgSoft,
-                        border: "1px solid rgba(0, 0, 0, 0.25)",
+                    <button
+                      onClick={() => {
+                        onSelect(item);
+                        onClose();
                       }}
+                      className="flex items-center gap-3 p-3 w-full text-left"
                     >
-                      {item.thumb ? (
-                        <img
-                          src={item.thumb}
-                          alt={item.name}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                      ) : (
-                        <div
-                          className="text-xs font-mono"
-                          style={{
-                            color: isSelected ? theme.text : theme.textMuted,
-                          }}
-                        >
-                          {layerType[0].toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium">{item.name}</div>
                       <div
-                        className="text-xs mt-0.5 space-y-0.5"
+                        className="w-12 h-12 rounded-lg flex items-center justify-center"
                         style={{
-                          color: isSelected ? theme.bg : theme.textMuted,
-                          opacity: 0.8,
+                          background: isSelected
+                            ? "rgba(0, 0, 0, 0.2)"
+                            : theme.bgSoft,
+                          border: "1px solid rgba(0, 0, 0, 0.25)",
                         }}
                       >
-                        <div className="flex gap-2">
-                          {item.duration && (
-                            <span>
-                              {Math.floor(item.duration / 60)}:
-                              {Math.floor(item.duration % 60)
-                                .toString()
-                                .padStart(2, "0")}
-                            </span>
-                          )}
-                          {item.format && <span>• {item.format.toUpperCase()}</span>}
-                        </div>
-                        {/* Show tags for music */}
-                        {layerType === "music" && item.tags && item.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {item.tags.map((tag) => (
-                              <span
-                                key={tag.id}
-                                className="px-1.5 py-0.5 rounded text-[10px]"
-                                style={{
-                                  background: isSelected
-                                    ? "rgba(0, 0, 0, 0.2)"
-                                    : theme.bgSoft,
-                                  border: `1px solid ${isSelected ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.25)"}`,
-                                }}
-                              >
-                                {tag.name}
-                              </span>
-                            ))}
+                        {item.thumb ? (
+                          <img
+                            src={item.thumb}
+                            alt={item.name}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        ) : (
+                          <div
+                            className="text-xs font-mono"
+                            style={{
+                              color: isSelected ? theme.text : theme.textMuted,
+                            }}
+                          >
+                            {layerType[0].toUpperCase()}
                           </div>
                         )}
-                        <div>{isSelected ? "Currently playing" : "Click to select"}</div>
                       </div>
-                    </div>
-                  </button>
+                      <div className="flex-1">
+                        <div className="font-medium">{item.name}</div>
+                        <div
+                          className="text-xs mt-0.5"
+                          style={{
+                            color: isSelected ? theme.bg : theme.textMuted,
+                            opacity: 0.8,
+                          }}
+                        >
+                          <div className="flex gap-2">
+                            {item.duration && (
+                              <span>
+                                {Math.floor(item.duration / 60)}:
+                                {Math.floor(item.duration % 60)
+                                  .toString()
+                                  .padStart(2, "0")}
+                              </span>
+                            )}
+                            {item.format && <span>• {item.format.toUpperCase()}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Tag management section (music only) */}
+                    {layerType === "music" && (
+                      <div className="px-3 pb-3 pt-0 flex items-center gap-2 flex-wrap">
+                        {/* Existing tags */}
+                        {item.tags && item.tags.length > 0 && item.tags.map((tag) => (
+                          <span
+                            key={tag.id}
+                            className="px-1.5 py-0.5 rounded text-[10px]"
+                            style={{
+                              background: isSelected
+                                ? "rgba(0, 0, 0, 0.2)"
+                                : theme.bgSoft,
+                              border: `1px solid ${isSelected ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.25)"}`,
+                            }}
+                          >
+                            {tag.name}
+                          </span>
+                        ))}
+
+                        {/* Tag button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenTagDropdown(isDropdownOpen ? null : item.id);
+                          }}
+                          className="p-1 rounded transition-colors"
+                          style={{
+                            background: isDropdownOpen ? theme.primary : "transparent",
+                            color: isDropdownOpen ? theme.bg : (isSelected ? theme.bg : theme.textMuted),
+                          }}
+                          title="Manage tags"
+                        >
+                          <TagIcon className="w-3 h-3" />
+                        </button>
+
+                        {/* Tag dropdown */}
+                        {isDropdownOpen && (
+                          <div
+                            className="absolute left-3 right-3 mt-1 p-2 rounded-lg shadow-lg z-50"
+                            style={{
+                              background: theme.card,
+                              border: `1px solid ${theme.bgSoft}`,
+                              maxHeight: "200px",
+                              overflowY: "auto",
+                              top: "100%",
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="text-xs font-semibold mb-2" style={{ color: theme.text }}>
+                              Tags for {item.name}
+                            </div>
+
+                            {/* Tag checkboxes */}
+                            {allAvailableTags.length > 0 ? (
+                              <div className="space-y-1">
+                                {allAvailableTags.map((tag) => {
+                                  const hasTag = item.tags?.some(t => t.id === tag.id) || false;
+                                  return (
+                                    <label
+                                      key={tag.id}
+                                      className="flex items-center gap-2 p-1 rounded cursor-pointer hover:bg-opacity-50"
+                                      style={{ background: hasTag ? theme.bgSoft : "transparent" }}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={hasTag}
+                                        onChange={() => handleToggleTag(item.id, tag.id, hasTag)}
+                                        className="w-3 h-3"
+                                      />
+                                      <span className="text-xs" style={{ color: theme.text }}>
+                                        {tag.name}
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-xs py-2" style={{ color: theme.textMuted }}>
+                                No tags available. Create one below.
+                              </div>
+                            )}
+
+                            {/* Create new tag */}
+                            <div className="mt-2 pt-2 border-t" style={{ borderColor: theme.bgSoft }}>
+                              <div className="flex gap-1">
+                                <input
+                                  type="text"
+                                  value={newTagInput}
+                                  onChange={(e) => setNewTagInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      handleCreateAndAssignTag(item.id);
+                                    } else if (e.key === "Escape") {
+                                      setOpenTagDropdown(null);
+                                    }
+                                  }}
+                                  placeholder="New tag..."
+                                  className="flex-1 px-2 py-1 text-xs rounded border-none outline-none"
+                                  style={{ background: theme.bgSoft, color: theme.text }}
+                                />
+                                <button
+                                  onClick={() => handleCreateAndAssignTag(item.id)}
+                                  className="p-1 rounded"
+                                  style={{ background: theme.primary, color: theme.bg }}
+                                  title="Create and assign"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Non-music: show selection text */}
+                    {layerType !== "music" && (
+                      <div className="px-3 pb-3 text-xs" style={{ color: isSelected ? theme.bg : theme.textMuted }}>
+                        {isSelected ? "Currently playing" : "Click to select"}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

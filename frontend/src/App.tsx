@@ -905,6 +905,7 @@ function App() {
           currentSelection={currentLayers.music}
           onSelect={(item) => handleLayerSelect("music", item)}
           onSelectTag={handleTagSelect}
+          onTagsUpdated={handleTagsUpdated}
         />
 
         {/* Scene Manager */}
