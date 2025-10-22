@@ -22,8 +22,6 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
 }) => {
   const [selectedTagFilter, setSelectedTagFilter] = useState<number | null>(null);
 
-  if (!isOpen) return null;
-
   // Extract all unique tags from music items
   const allTags = useMemo(() => {
     if (layerType !== "music") return [];
@@ -43,6 +41,8 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
     }
     return items.filter((item) => item.tags?.some((tag) => tag.id === selectedTagFilter));
   }, [items, selectedTagFilter, layerType]);
+
+  if (!isOpen) return null;
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
