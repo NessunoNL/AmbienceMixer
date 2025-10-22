@@ -370,6 +370,7 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
                       boxShadow: isSelected
                         ? `0 0 0 3px rgba(167, 192, 128, 0.2)`
                         : "0 2px 6px rgba(0, 0, 0, 0.3)",
+                      zIndex: isDropdownOpen ? 100 : 1,
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected) {
