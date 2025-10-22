@@ -1,4 +1,4 @@
-import type { Scene } from "../types";
+import type { Scene, MusicTag } from "../types";
 
 const API_BASE = "/api";
 
@@ -16,6 +16,7 @@ export interface AudioFile {
   duration?: number;
   format: string;
   volume: number;
+  tags?: MusicTag[];
 }
 
 class ApiClient {
@@ -81,6 +82,85 @@ class ApiClient {
     });
     if (!response.ok) {
       throw new Error("Failed to delete scene");
+    }
+    return response.json();
+  }
+
+  // Music tag methods
+  async getAllMusicTags(): Promise<MusicTag[]> {
+    const response = await fetch(`${API_BASE}/music/tags`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch music tags");
+    }
+    return response.json();
+  }
+
+  async createMusicTag(name: string, color?: string): Promise<{ success: boolean; tag: MusicTag }> {
+    const response = await fetch(`${API_BASE}/music/tags`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, color }),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to create music tag");
+    }
+    return response.json();
+  }
+
+  async updateMusicTag(id: number, name: string, color?: string): Promise<{ success: boolean; tag: MusicTag }> {
+    const response = await fetch(`${API_BASE}/music/tags/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, color }),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to update music tag");
+    }
+    return response.json();
+  }
+
+  async deleteMusicTag(id: number): Promise<{ success: boolean; id: number }> {
+    const response = await fetch(`${API_BASE}/music/tags/${id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete music tag");
+    }
+    return response.json();
+  }
+
+  async getTagsForAudioFile(audioFileId: number): Promise<MusicTag[]> {
+    const response = await fetch(`${API_BASE}/music/${audioFileId}/tags`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch tags for audio file");
+    }
+    return response.json();
+  }
+
+  async addTagToAudioFile(audioFileId: number, tagId: number): Promise<{ success: boolean }> {
+    const response = await fetch(`${API_BASE}/music/${audioFileId}/tags/${tagId}`, {
+      method: "POST",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to add tag to audio file");
+    }
+    return response.json();
+  }
+
+  async removeTagFromAudioFile(audioFileId: number, tagId: number): Promise<{ success: boolean }> {
+    const response = await fetch(`${API_BASE}/music/${audioFileId}/tags/${tagId}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to remove tag from audio file");
+    }
+    return response.json();
+  }
+
+  async getAudioFilesByTag(tagId: number): Promise<AudioFile[]> {
+    const response = await fetch(`${API_BASE}/music/by-tag/${tagId}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch audio files by tag");
     }
     return response.json();
   }

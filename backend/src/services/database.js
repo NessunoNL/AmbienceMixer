@@ -97,6 +97,76 @@ class DatabaseService {
     return stmt.run(id);
   }
 
+  // Music tags methods
+  getAllMusicTags() {
+    const stmt = this.db.prepare('SELECT * FROM music_tags ORDER BY name');
+    return stmt.all();
+  }
+
+  getMusicTagById(id) {
+    const stmt = this.db.prepare('SELECT * FROM music_tags WHERE id = ?');
+    return stmt.get(id);
+  }
+
+  insertMusicTag(tag) {
+    const stmt = this.db.prepare(`
+      INSERT INTO music_tags (name, color)
+      VALUES (@name, @color)
+    `);
+    return stmt.run(tag);
+  }
+
+  updateMusicTag(id, tag) {
+    const stmt = this.db.prepare(`
+      UPDATE music_tags
+      SET name = @name, color = @color
+      WHERE id = @id
+    `);
+    return stmt.run({ ...tag, id });
+  }
+
+  deleteMusicTag(id) {
+    const stmt = this.db.prepare('DELETE FROM music_tags WHERE id = ?');
+    return stmt.run(id);
+  }
+
+  // Audio file tags methods
+  getTagsForAudioFile(audioFileId) {
+    const stmt = this.db.prepare(`
+      SELECT mt.* FROM music_tags mt
+      INNER JOIN audio_file_tags aft ON mt.id = aft.tag_id
+      WHERE aft.audio_file_id = ?
+      ORDER BY mt.name
+    `);
+    return stmt.all(audioFileId);
+  }
+
+  addTagToAudioFile(audioFileId, tagId) {
+    const stmt = this.db.prepare(`
+      INSERT OR IGNORE INTO audio_file_tags (audio_file_id, tag_id)
+      VALUES (?, ?)
+    `);
+    return stmt.run(audioFileId, tagId);
+  }
+
+  removeTagFromAudioFile(audioFileId, tagId) {
+    const stmt = this.db.prepare(`
+      DELETE FROM audio_file_tags
+      WHERE audio_file_id = ? AND tag_id = ?
+    `);
+    return stmt.run(audioFileId, tagId);
+  }
+
+  getAudioFilesByTag(tagId) {
+    const stmt = this.db.prepare(`
+      SELECT af.* FROM audio_files af
+      INNER JOIN audio_file_tags aft ON af.id = aft.audio_file_id
+      WHERE aft.tag_id = ? AND af.category = 'music'
+      ORDER BY af.name
+    `);
+    return stmt.all(tagId);
+  }
+
   close() {
     this.db.close();
   }

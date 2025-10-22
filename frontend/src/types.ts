@@ -1,3 +1,9 @@
+export interface MusicTag {
+  id: number;
+  name: string;
+  color?: string;
+}
+
 export interface AudioLayer {
   id: string;
   url: string;
@@ -6,7 +12,10 @@ export interface AudioLayer {
   volume: number;
   duration?: number;
   format?: string;
+  tags?: MusicTag[];
 }
+
+export type MusicPlaybackMode = "single-loop" | "tag-shuffle";
 
 export interface Scene {
   id: string;
@@ -19,6 +28,8 @@ export interface Scene {
   environmentVolume?: number;
   weatherVolume?: number;
   musicVolume?: number;
+  musicMode?: MusicPlaybackMode;
+  musicTagId?: number;
 }
 
 export interface OneShot {

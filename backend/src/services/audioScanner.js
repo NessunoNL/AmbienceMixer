@@ -111,14 +111,21 @@ class AudioScanner {
     };
 
     for (const file of files) {
-      library[file.category].push({
+      const audioFile = {
         id: file.id,
         name: file.name,
         url: file.path, // Frontend will use this to construct the stream URL
         duration: file.duration,
         format: file.format,
         volume: 0.7, // Default volume
-      });
+      };
+
+      // Add tags for music files
+      if (file.category === 'music') {
+        audioFile.tags = db.getTagsForAudioFile(file.id);
+      }
+
+      library[file.category].push(audioFile);
     }
 
     return library;

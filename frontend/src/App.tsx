@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Music, CloudRain, Trees, Settings2, VolumeX, Volume2, RefreshCw } from "lucide-react";
+import { Music, CloudRain, Trees, Settings2, VolumeX, Volume2, RefreshCw, Tag } from "lucide-react";
 import { Section } from "./components/Section";
 import { SceneChip } from "./components/SceneChip";
 import { VerticalFader } from "./components/VerticalFader";
@@ -8,11 +8,13 @@ import { OneShotButton } from "./components/OneShotButton";
 import { LayerPicker } from "./components/LayerPicker";
 import { SceneManager } from "./components/SceneManager";
 import { OneShotPicker } from "./components/OneShotPicker";
+import { MusicTagManager } from "./components/MusicTagManager";
+import { MusicModeSelector } from "./components/MusicModeSelector";
 import { AudioEngine } from "./audioEngine";
 import { iconMap } from "./iconMap";
 import { api } from "./services/api";
 import { theme } from "./theme";
-import type { LayerType, AudioLayer, Scene, OneShot } from "./types";
+import type { LayerType, AudioLayer, Scene, OneShot, MusicTag, MusicPlaybackMode } from "./types";
 import type { AudioFile } from "./services/api";
 
 function App() {
@@ -57,6 +59,13 @@ function App() {
 
   // Track temporary one-shot overrides (not saved to scene)
   const [temporaryOneShots, setTemporaryOneShots] = useState<OneShot[] | null>(null);
+
+  // Music tags and playback mode
+  const [musicTags, setMusicTags] = useState<MusicTag[]>([]);
+  const [musicMode, setMusicMode] = useState<MusicPlaybackMode>("single-loop");
+  const [selectedMusicTag, setSelectedMusicTag] = useState<MusicTag | null>(null);
+  const [currentTrackInfo, setCurrentTrackInfo] = useState<{ name: string; index: number; total: number } | null>(null);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
 
   // Track current layer selections (independent of scenes) - load from localStorage
   const [currentLayers, setCurrentLayers] = useState<{
@@ -181,6 +190,10 @@ function App() {
         };
         setAudioLibrary(convertedLibrary);
 
+        // Load music tags
+        const tags = await api.getAllMusicTags();
+        setMusicTags(tags);
+
         // Load scenes from backend
         const backendScenes = await api.getScenes();
         setScenes(backendScenes);
@@ -197,6 +210,25 @@ function App() {
 
     loadData();
   }, []);
+
+  // Reload audio library when tags are updated
+  const handleTagsUpdated = async () => {
+    try {
+      const library = await api.getAudioLibrary();
+      const convertedLibrary = {
+        environment: library.environment.map(convertAudioFile),
+        weather: library.weather.map(convertAudioFile),
+        music: library.music.map(convertAudioFile),
+        oneshots: library.oneshots.map(convertAudioFile),
+      };
+      setAudioLibrary(convertedLibrary);
+
+      const tags = await api.getAllMusicTags();
+      setMusicTags(tags);
+    } catch (error) {
+      console.error("Failed to reload library:", error);
+    }
+  };
 
   // Persist current scene to localStorage (as cache)
   useEffect(() => {
@@ -337,8 +369,76 @@ function App() {
     }
   };
 
+  // Handle music mode change
+  const handleMusicModeChange = (mode: MusicPlaybackMode) => {
+    setMusicMode(mode);
+
+    // If switching to tag-shuffle mode and a tag is selected, load the playlist
+    if (mode === "tag-shuffle" && selectedMusicTag) {
+      loadMusicPlaylist(selectedMusicTag);
+    }
+  };
+
+  // Handle music tag selection
+  const handleMusicTagSelect = async (tag: MusicTag | null) => {
+    setSelectedMusicTag(tag);
+
+    // If in tag-shuffle mode and a tag is selected, load the playlist
+    if (musicMode === "tag-shuffle" && tag) {
+      await loadMusicPlaylist(tag);
+    }
+  };
+
+  // Load music playlist by tag
+  const loadMusicPlaylist = async (tag: MusicTag) => {
+    if (!audioEngineRef.current || !audioInitialized) return;
+
+    try {
+      const files = await api.getAudioFilesByTag(tag.id);
+
+      if (files.length === 0) {
+        alert(`No music files found with tag "${tag.name}"`);
+        return;
+      }
+
+      const urls = files.map(file => api.getAudioStreamUrl(file.id));
+      await audioEngineRef.current.loadMusicPlaylist(
+        urls,
+        muted.music ? 0 : volumes.music / 100,
+        true // shuffle
+      );
+
+      // Update track info
+      updateCurrentTrackInfo();
+    } catch (error) {
+      console.error("Failed to load music playlist:", error);
+      alert("Failed to load music playlist");
+    }
+  };
+
+  // Update current track info (for display)
+  const updateCurrentTrackInfo = () => {
+    if (audioEngineRef.current) {
+      const trackInfo = audioEngineRef.current.getCurrentTrackInfo();
+      setCurrentTrackInfo(trackInfo);
+    }
+  };
+
+  // Skip to next track in playlist
+  const handleSkipTrack = async () => {
+    if (audioEngineRef.current && musicMode === "tag-shuffle") {
+      await audioEngineRef.current.playNextTrack();
+      updateCurrentTrackInfo();
+    }
+  };
+
   // Handle layer selection from picker - add to queue instead of loading immediately
   const handleLayerSelect = (layer: LayerType, item: AudioLayer | null) => {
+    // If selecting music in single-loop mode, clear playlist
+    if (layer === "music" && musicMode === "single-loop") {
+      setCurrentTrackInfo(null);
+    }
+
     setQueuedLayers((prev) => ({
       ...prev,
       [layer]: { layer: item, duration: defaultCrossfadeDurations[layer] }
@@ -610,6 +710,24 @@ function App() {
             >
               <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
             </button>
+            <button
+              onClick={() => setTagManagerOpen(true)}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                background: theme.bgSoft,
+                color: theme.primary,
+                border: `1px solid rgba(0, 0, 0, 0.25)`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = "0.8";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = "1";
+              }}
+              title="Manage music tags"
+            >
+              <Tag className="w-5 h-5" />
+            </button>
           </div>
           {loading ? (
             <p className="text-sm mt-2" style={{ color: theme.textMuted }}>
@@ -760,6 +878,22 @@ function App() {
           />
         </section>
 
+        {/* Music Playback Mode */}
+        <Section className="p-3">
+          <div className="font-semibold mb-3" style={{ color: theme.text }}>
+            Music Playback
+          </div>
+          <MusicModeSelector
+            mode={musicMode}
+            selectedTag={selectedMusicTag}
+            availableTags={musicTags}
+            currentTrack={currentTrackInfo}
+            onModeChange={handleMusicModeChange}
+            onTagSelect={handleMusicTagSelect}
+            onSkipTrack={handleSkipTrack}
+          />
+        </Section>
+
         {/* Layer Pickers */}
         <LayerPicker
           isOpen={pickerOpen === "environment"}
@@ -895,6 +1029,14 @@ function App() {
           currentSelection={displayedOneShots}
           onApply={handleTemporaryOneShotsApply}
           temporary={true}
+        />
+
+        {/* Music Tag Manager */}
+        <MusicTagManager
+          isOpen={tagManagerOpen}
+          onClose={() => setTagManagerOpen(false)}
+          musicFiles={audioLibrary.music}
+          onTagsUpdated={handleTagsUpdated}
         />
         </>
         )}

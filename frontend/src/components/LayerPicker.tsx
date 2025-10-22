@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { X } from "lucide-react";
 import { theme } from "../theme";
-import type { AudioLayer, LayerType } from "../types";
+import type { AudioLayer, LayerType, MusicTag } from "../types";
 
 interface LayerPickerProps {
   isOpen: boolean;
@@ -20,7 +20,29 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
   currentSelection,
   onSelect,
 }) => {
+  const [selectedTagFilter, setSelectedTagFilter] = useState<number | null>(null);
+
   if (!isOpen) return null;
+
+  // Extract all unique tags from music items
+  const allTags = useMemo(() => {
+    if (layerType !== "music") return [];
+    const tagMap = new Map<number, MusicTag>();
+    items.forEach((item) => {
+      item.tags?.forEach((tag) => {
+        tagMap.set(tag.id, tag);
+      });
+    });
+    return Array.from(tagMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [items, layerType]);
+
+  // Filter items by selected tag
+  const filteredItems = useMemo(() => {
+    if (layerType !== "music" || selectedTagFilter === null) {
+      return items;
+    }
+    return items.filter((item) => item.tags?.some((tag) => tag.id === selectedTagFilter));
+  }, [items, selectedTagFilter, layerType]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -53,38 +75,73 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between p-4 border-b"
+          className="p-4 border-b"
           style={{
             borderColor: "rgba(255, 255, 255, 0.1)",
             background: theme.bgSoft,
           }}
         >
-          <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
-            Select {layerLabels[layerType]}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg transition-colors"
-            style={{
-              background: "transparent",
-              color: theme.textMuted,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = theme.card;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-            }}
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
+              Select {layerLabels[layerType]}
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                background: "transparent",
+                color: theme.textMuted,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = theme.card;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Tag Filter (only for music) */}
+          {layerType === "music" && allTags.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setSelectedTagFilter(null)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                style={{
+                  background: selectedTagFilter === null ? theme.primary : theme.card,
+                  color: selectedTagFilter === null ? theme.bg : theme.text,
+                  border: `1px solid ${selectedTagFilter === null ? theme.primary : "rgba(0,0,0,0.25)"}`,
+                }}
+              >
+                All
+              </button>
+              {allTags.map((tag) => (
+                <button
+                  key={tag.id}
+                  onClick={() => setSelectedTagFilter(tag.id)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                  style={{
+                    background: selectedTagFilter === tag.id ? theme.primary : theme.card,
+                    color: selectedTagFilter === tag.id ? theme.bg : theme.text,
+                    border: `1px solid ${selectedTagFilter === tag.id ? theme.primary : "rgba(0,0,0,0.25)"}`,
+                  }}
+                >
+                  {tag.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Content */}
         <div className="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
-          {items.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <div className="text-center py-8" style={{ color: theme.textMuted }}>
-              No {layerLabels[layerType].toLowerCase()} sounds available
+              {selectedTagFilter
+                ? "No music files with this tag"
+                : `No ${layerLabels[layerType].toLowerCase()} sounds available`}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -150,7 +207,7 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
                 </div>
               </button>
 
-              {items.map((item) => {
+              {filteredItems.map((item) => {
                 const isSelected = currentSelection?.id === item.id;
                 return (
                   <button
@@ -229,6 +286,25 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
                           )}
                           {item.format && <span>• {item.format.toUpperCase()}</span>}
                         </div>
+                        {/* Show tags for music */}
+                        {layerType === "music" && item.tags && item.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.tags.map((tag) => (
+                              <span
+                                key={tag.id}
+                                className="px-1.5 py-0.5 rounded text-[10px]"
+                                style={{
+                                  background: isSelected
+                                    ? "rgba(0, 0, 0, 0.2)"
+                                    : theme.bgSoft,
+                                  border: `1px solid ${isSelected ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.25)"}`,
+                                }}
+                              >
+                                {tag.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <div>{isSelected ? "Currently playing" : "Click to select"}</div>
                       </div>
                     </div>
