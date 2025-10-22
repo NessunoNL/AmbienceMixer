@@ -1,0 +1,24 @@
+{
+  "name": "Ambience Mixer",
+  "short_name": "Ambience",
+  "description": "Mobile-first web app for Dungeon Masters to control music and ambient sounds during tabletop RPG sessions",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2d353b",
+  "theme_color": "#2d353b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

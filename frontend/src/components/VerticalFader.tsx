@@ -58,6 +58,27 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
     }
   }, [isDragging]);
 
+  // Handle touch drag
+  useEffect(() => {
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isDragging && e.touches.length > 0) {
+        e.preventDefault(); // Prevent page scrolling
+        handleMove(e.touches[0].clientY);
+      }
+    };
+
+    const handleTouchEnd = () => setIsDragging(false);
+
+    if (isDragging) {
+      document.addEventListener("touchmove", handleTouchMove, { passive: false });
+      document.addEventListener("touchend", handleTouchEnd);
+      return () => {
+        document.removeEventListener("touchmove", handleTouchMove);
+        document.removeEventListener("touchend", handleTouchEnd);
+      };
+    }
+  }, [isDragging]);
+
   // Handle wheel events with passive: false to allow preventDefault
   useEffect(() => {
     const trackElement = trackRef.current?.parentElement;
@@ -92,6 +113,12 @@ export const VerticalFader: React.FC<VerticalFaderProps> = ({
           onMouseDown={(e) => {
             setIsDragging(true);
             handleMove(e.clientY);
+          }}
+          onTouchStart={(e) => {
+            if (e.touches.length > 0) {
+              setIsDragging(true);
+              handleMove(e.touches[0].clientY);
+            }
           }}
         >
           {/* Thin visual bar */}
