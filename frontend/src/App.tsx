@@ -430,8 +430,20 @@ function App() {
   // Handle volume change
   const handleVolumeChange = (layer: LayerType, value: number) => {
     setVolumes((prev) => ({ ...prev, [layer]: value }));
-    if (audioEngineRef.current && audioInitialized && !muted[layer]) {
-      audioEngineRef.current.setVolume(layer, value / 100);
+
+    // If layer is muted and user moves slider above 0, unmute it
+    const wasMuted = muted[layer];
+    if (wasMuted && value > 0) {
+      setMuted((prev) => ({ ...prev, [layer]: false }));
+      // Also update preMuteVolumes to the new value so it doesn't revert
+      setPreMuteVolumes((prev) => ({ ...prev, [layer]: value }));
+    }
+
+    // Update audio engine (unmute if it was muted and value > 0)
+    if (audioEngineRef.current && audioInitialized) {
+      if (!muted[layer] || (wasMuted && value > 0)) {
+        audioEngineRef.current.setVolume(layer, value / 100);
+      }
     }
   };
 
@@ -457,7 +469,7 @@ function App() {
     }
   };
 
-  // Handle main mute toggle (all layers)
+  // Handle main mute toggle (all layers) with 2-second animation
   const handleMainMuteToggle = () => {
     const newMainMutedState = !mainMuted;
     setMainMuted(newMainMutedState);
@@ -466,15 +478,22 @@ function App() {
       const layers: LayerType[] = ["environment", "weather", "music"];
 
       if (newMainMutedState) {
-        // Fade all layers to 0 when main muting
+        // Save current volumes and animate all sliders to 0 over 2 seconds
         layers.forEach((layer) => {
-          audioEngineRef.current!.setVolume(layer, 0, 0.3);
+          if (!muted[layer]) {
+            setPreMuteVolumes((prev) => ({ ...prev, [layer]: volumes[layer] }));
+            animateVolume(layer, volumes[layer], 0, 2, true);
+            audioEngineRef.current!.setVolume(layer, 0, 2);
+          }
         });
       } else {
-        // Fade back to current volumes when unmuting (respect individual mute states)
+        // Animate all sliders back to saved volumes over 2 seconds (respect individual mute states)
         layers.forEach((layer) => {
-          const targetVolume = muted[layer] ? 0 : volumes[layer] / 100;
-          audioEngineRef.current!.setVolume(layer, targetVolume, 0.3);
+          if (!muted[layer]) {
+            const targetVolume = preMuteVolumes[layer];
+            animateVolume(layer, 0, targetVolume, 2, true);
+            audioEngineRef.current!.setVolume(layer, targetVolume / 100, 2);
+          }
         });
       }
     }
