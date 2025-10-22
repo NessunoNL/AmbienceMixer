@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Plus, Tag, Trash2 } from "lucide-react";
+import { X, Plus, Tag, Trash2, Check } from "lucide-react";
 import { theme } from "../theme";
 import type { MusicTag, AudioLayer } from "../types";
 import { api } from "../services/api";
@@ -19,7 +19,8 @@ export function MusicTagManager({
 }: MusicTagManagerProps) {
   const [allTags, setAllTags] = useState<MusicTag[]>([]);
   const [newTagName, setNewTagName] = useState("");
-  const [selectedFile, setSelectedFile] = useState<AudioLayer | null>(null);
+  const [selectedTag, setSelectedTag] = useState<MusicTag | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -69,19 +70,61 @@ export function MusicTagManager({
     }
   };
 
-  const handleToggleTag = async (file: AudioLayer, tag: MusicTag) => {
-    const hasTag = file.tags?.some((t) => t.id === tag.id);
-    const fileId = parseInt(file.id);
+  const handleToggleFile = (fileId: string) => {
+    const newSelection = new Set(selectedFiles);
+    if (newSelection.has(fileId)) {
+      newSelection.delete(fileId);
+    } else {
+      newSelection.add(fileId);
+    }
+    setSelectedFiles(newSelection);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedFiles.size === musicFiles.length) {
+      setSelectedFiles(new Set());
+    } else {
+      setSelectedFiles(new Set(musicFiles.map(f => f.id)));
+    }
+  };
+
+  const handleBulkAssignTag = async () => {
+    if (!selectedTag || selectedFiles.size === 0) return;
 
     try {
-      if (hasTag) {
-        await api.removeTagFromAudioFile(fileId, tag.id);
-      } else {
-        await api.addTagToAudioFile(fileId, tag.id);
-      }
+      setLoading(true);
+      const promises = Array.from(selectedFiles).map(fileId =>
+        api.addTagToAudioFile(parseInt(fileId), selectedTag.id)
+      );
+      await Promise.all(promises);
       onTagsUpdated();
+      setSelectedFiles(new Set());
+      alert(`Tag "${selectedTag.name}" assigned to ${selectedFiles.size} file(s)`);
     } catch (error) {
-      console.error("Failed to toggle tag:", error);
+      console.error("Failed to bulk assign tag:", error);
+      alert("Failed to assign tags to some files");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBulkRemoveTag = async () => {
+    if (!selectedTag || selectedFiles.size === 0) return;
+
+    try {
+      setLoading(true);
+      const promises = Array.from(selectedFiles).map(fileId =>
+        api.removeTagFromAudioFile(parseInt(fileId), selectedTag.id)
+      );
+      await Promise.all(promises);
+      onTagsUpdated();
+      setSelectedFiles(new Set());
+      alert(`Tag "${selectedTag.name}" removed from ${selectedFiles.size} file(s)`);
+    } catch (error) {
+      console.error("Failed to bulk remove tag:", error);
+      alert("Failed to remove tags from some files");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -195,65 +238,125 @@ export function MusicTagManager({
           )}
         </div>
 
-        {/* Assign Tags to Music Files */}
+        {/* Bulk Assign Tags */}
         <div>
-          <h3 className="text-sm font-semibold mb-3">Assign Tags to Music</h3>
+          <h3 className="text-sm font-semibold mb-3">Bulk Assign Tags</h3>
           {musicFiles.length === 0 ? (
             <p className="text-center py-4" style={{ color: theme.textMuted }}>
               No music files found.
             </p>
+          ) : allTags.length === 0 ? (
+            <p className="text-center py-4" style={{ color: theme.textMuted }}>
+              Create a tag first to assign it to files.
+            </p>
           ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {musicFiles.map((file) => (
-                <div
-                  key={file.id}
-                  className="p-3 rounded-lg"
-                  style={{
-                    background: selectedFile?.id === file.id ? theme.bgSoft : theme.bg,
-                  }}
-                >
-                  <div
-                    className="flex items-center justify-between mb-2 cursor-pointer"
-                    onClick={() =>
-                      setSelectedFile(selectedFile?.id === file.id ? null : file)
-                    }
-                  >
-                    <span className="font-medium">{file.name}</span>
-                    <span className="text-xs" style={{ color: theme.textMuted }}>
-                      {file.tags?.length || 0} tags
-                    </span>
+            <>
+              {/* Tag Selection */}
+              <div className="mb-3 p-3 rounded-lg" style={{ background: theme.bgSoft }}>
+                <label className="text-xs font-medium mb-2 block" style={{ color: theme.textMuted }}>
+                  Select tag to assign:
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {allTags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      onClick={() => setSelectedTag(selectedTag?.id === tag.id ? null : tag)}
+                      className="px-3 py-1.5 rounded-lg text-sm transition-colors"
+                      style={{
+                        background: selectedTag?.id === tag.id ? theme.primary : theme.card,
+                        color: selectedTag?.id === tag.id ? theme.bg : theme.text,
+                        border: `1px solid ${selectedTag?.id === tag.id ? theme.primary : theme.bgSoft}`,
+                      }}
+                    >
+                      {tag.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* File Selection */}
+              {selectedTag && (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium" style={{ color: theme.textMuted }}>
+                      Select files ({selectedFiles.size} selected):
+                    </label>
+                    <button
+                      onClick={handleSelectAll}
+                      className="text-xs px-2 py-1 rounded transition-colors"
+                      style={{ background: theme.bgSoft, color: theme.primary }}
+                    >
+                      {selectedFiles.size === musicFiles.length ? "Deselect All" : "Select All"}
+                    </button>
                   </div>
 
-                  {selectedFile?.id === file.id && allTags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t" style={{ borderColor: theme.bgSoft }}>
-                      {allTags.map((tag) => {
-                        const hasTag = file.tags?.some((t) => t.id === tag.id);
-                        return (
-                          <button
-                            key={tag.id}
-                            onClick={() => handleToggleTag(file, tag)}
-                            className="px-2 py-1 rounded text-xs transition-colors"
+                  <div className="space-y-1 max-h-64 overflow-y-auto mb-3">
+                    {musicFiles.map((file) => {
+                      const isSelected = selectedFiles.has(file.id);
+                      const hasTag = file.tags?.some((t) => t.id === selectedTag.id);
+                      return (
+                        <div
+                          key={file.id}
+                          onClick={() => handleToggleFile(file.id)}
+                          className="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors"
+                          style={{
+                            background: isSelected ? theme.bgSoft : theme.bg,
+                            border: `1px solid ${isSelected ? theme.primary : "transparent"}`,
+                          }}
+                        >
+                          <div
+                            className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                             style={{
-                              background: hasTag ? theme.primary : theme.card,
-                              color: hasTag ? theme.bg : theme.text,
-                              border: `1px solid ${hasTag ? theme.primary : theme.bgSoft}`,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.opacity = "0.8";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.opacity = "1";
+                              background: isSelected ? theme.primary : theme.bgSoft,
+                              color: theme.bg,
+                              border: `1px solid ${isSelected ? theme.primary : theme.bgSoft}`,
                             }}
                           >
-                            {tag.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                            {isSelected && <Check className="w-3 h-3" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{file.name}</div>
+                            {hasTag && (
+                              <div className="text-xs" style={{ color: theme.primary }}>
+                                Already has this tag
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Bulk Actions */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleBulkAssignTag}
+                      disabled={loading || selectedFiles.size === 0}
+                      className="flex-1 px-4 py-2 rounded-lg font-medium transition-colors"
+                      style={{
+                        background: theme.primary,
+                        color: theme.bg,
+                        opacity: loading || selectedFiles.size === 0 ? 0.5 : 1,
+                      }}
+                    >
+                      Assign to {selectedFiles.size} file{selectedFiles.size !== 1 ? "s" : ""}
+                    </button>
+                    <button
+                      onClick={handleBulkRemoveTag}
+                      disabled={loading || selectedFiles.size === 0}
+                      className="flex-1 px-4 py-2 rounded-lg font-medium transition-colors"
+                      style={{
+                        background: theme.bgSoft,
+                        color: theme.text,
+                        opacity: loading || selectedFiles.size === 0 ? 0.5 : 1,
+                      }}
+                    >
+                      Remove from {selectedFiles.size} file{selectedFiles.size !== 1 ? "s" : ""}
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
           )}
         </div>
       </div>
