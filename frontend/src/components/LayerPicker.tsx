@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { X } from "lucide-react";
+import { X, Music, Shuffle } from "lucide-react";
 import { theme } from "../theme";
 import type { AudioLayer, LayerType, MusicTag } from "../types";
 
@@ -10,6 +10,7 @@ interface LayerPickerProps {
   items: AudioLayer[];
   currentSelection?: AudioLayer | null;
   onSelect: (item: AudioLayer | null) => void;
+  onSelectTag?: (tag: MusicTag) => void;
 }
 
 export const LayerPicker: React.FC<LayerPickerProps> = ({
@@ -19,8 +20,10 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
   items,
   currentSelection,
   onSelect,
+  onSelectTag,
 }) => {
   const [selectedTagFilter, setSelectedTagFilter] = useState<number | null>(null);
+  const [musicPickerMode, setMusicPickerMode] = useState<"single" | "tag">("single");
 
   // Extract all unique tags from music items
   const allTags = useMemo(() => {
@@ -103,8 +106,38 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
             </button>
           </div>
 
-          {/* Tag Filter (only for music) */}
+          {/* Music Mode Toggle */}
           {layerType === "music" && allTags.length > 0 && (
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => setMusicPickerMode("single")}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  background: musicPickerMode === "single" ? theme.primary : theme.card,
+                  color: musicPickerMode === "single" ? theme.bg : theme.text,
+                  border: `1px solid ${musicPickerMode === "single" ? theme.primary : "rgba(0,0,0,0.25)"}`,
+                }}
+              >
+                <Music className="w-4 h-4" />
+                Single Track
+              </button>
+              <button
+                onClick={() => setMusicPickerMode("tag")}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  background: musicPickerMode === "tag" ? theme.primary : theme.card,
+                  color: musicPickerMode === "tag" ? theme.bg : theme.text,
+                  border: `1px solid ${musicPickerMode === "tag" ? theme.primary : "rgba(0,0,0,0.25)"}`,
+                }}
+              >
+                <Shuffle className="w-4 h-4" />
+                Tag Playlist
+              </button>
+            </div>
+          )}
+
+          {/* Tag Filter (only for music in single mode) */}
+          {layerType === "music" && musicPickerMode === "single" && allTags.length > 0 && (
             <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => setSelectedTagFilter(null)}
@@ -137,7 +170,64 @@ export const LayerPicker: React.FC<LayerPickerProps> = ({
 
         {/* Content */}
         <div className="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
-          {filteredItems.length === 0 ? (
+          {layerType === "music" && musicPickerMode === "tag" ? (
+            /* Tag Selection View */
+            allTags.length === 0 ? (
+              <div className="text-center py-8" style={{ color: theme.textMuted }}>
+                No tags available. Create tags in the tag manager.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {allTags.map((tag) => {
+                  const fileCount = items.filter(item =>
+                    item.tags?.some(t => t.id === tag.id)
+                  ).length;
+
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => {
+                        if (onSelectTag) {
+                          onSelectTag(tag);
+                          onClose();
+                        }
+                      }}
+                      className="flex items-center gap-3 p-4 rounded-xl transition-all text-left"
+                      style={{
+                        background: theme.card,
+                        border: "1px solid rgba(0, 0, 0, 0.25)",
+                        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.3)",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = theme.bgSoft;
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = theme.card;
+                        e.currentTarget.style.transform = "translateY(0)";
+                      }}
+                    >
+                      <div
+                        className="w-12 h-12 rounded-lg flex items-center justify-center"
+                        style={{
+                          background: theme.primary,
+                          color: theme.bg,
+                        }}
+                      >
+                        <Shuffle className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-base">{tag.name}</div>
+                        <div className="text-xs mt-0.5" style={{ color: theme.textMuted }}>
+                          {fileCount} track{fileCount !== 1 ? "s" : ""} • Shuffle playlist
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )
+          ) : filteredItems.length === 0 ? (
             <div className="text-center py-8" style={{ color: theme.textMuted }}>
               {selectedTagFilter
                 ? "No music files with this tag"

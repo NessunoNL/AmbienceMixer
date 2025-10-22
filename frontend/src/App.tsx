@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Music, CloudRain, Trees, Settings2, VolumeX, Volume2, RefreshCw, Tag } from "lucide-react";
+import { Music, CloudRain, Trees, Settings2, VolumeX, Volume2, RefreshCw, Tag, SkipForward } from "lucide-react";
 import { Section } from "./components/Section";
 import { SceneChip } from "./components/SceneChip";
 import { VerticalFader } from "./components/VerticalFader";
@@ -9,7 +9,6 @@ import { LayerPicker } from "./components/LayerPicker";
 import { SceneManager } from "./components/SceneManager";
 import { OneShotPicker } from "./components/OneShotPicker";
 import { MusicTagManager } from "./components/MusicTagManager";
-import { MusicModeSelector } from "./components/MusicModeSelector";
 import { AudioEngine } from "./audioEngine";
 import { iconMap } from "./iconMap";
 import { api } from "./services/api";
@@ -369,25 +368,6 @@ function App() {
     }
   };
 
-  // Handle music mode change
-  const handleMusicModeChange = (mode: MusicPlaybackMode) => {
-    setMusicMode(mode);
-
-    // If switching to tag-shuffle mode and a tag is selected, load the playlist
-    if (mode === "tag-shuffle" && selectedMusicTag) {
-      loadMusicPlaylist(selectedMusicTag);
-    }
-  };
-
-  // Handle music tag selection
-  const handleMusicTagSelect = async (tag: MusicTag | null) => {
-    setSelectedMusicTag(tag);
-
-    // If in tag-shuffle mode and a tag is selected, load the playlist
-    if (musicMode === "tag-shuffle" && tag) {
-      await loadMusicPlaylist(tag);
-    }
-  };
 
   // Load music playlist by tag
   const loadMusicPlaylist = async (tag: MusicTag) => {
@@ -434,8 +414,10 @@ function App() {
 
   // Handle layer selection from picker - add to queue instead of loading immediately
   const handleLayerSelect = (layer: LayerType, item: AudioLayer | null) => {
-    // If selecting music in single-loop mode, clear playlist
-    if (layer === "music" && musicMode === "single-loop") {
+    // If selecting music in single-loop mode, clear playlist and track info
+    if (layer === "music") {
+      setMusicMode("single-loop");
+      setSelectedMusicTag(null);
       setCurrentTrackInfo(null);
     }
 
@@ -443,6 +425,17 @@ function App() {
       ...prev,
       [layer]: { layer: item, duration: defaultCrossfadeDurations[layer] }
     }));
+  };
+
+  // Handle tag selection from music picker
+  const handleTagSelect = async (tag: MusicTag) => {
+    setMusicMode("tag-shuffle");
+    setSelectedMusicTag(tag);
+
+    // Load the playlist if audio is initialized
+    if (audioInitialized) {
+      await loadMusicPlaylist(tag);
+    }
   };
 
   // Handle crossfade duration change for a queued layer
@@ -869,30 +862,30 @@ function App() {
           <LayerTile
             label="Music"
             icon={Music}
-            selected={currentLayers.music}
+            selected={
+              musicMode === "tag-shuffle" && selectedMusicTag
+                ? { name: `Tag: ${selectedMusicTag.name}` }
+                : currentLayers.music
+            }
             queued={queuedLayers.music}
             defaultDuration={defaultCrossfadeDurations.music}
             onPick={() => setPickerOpen("music")}
             onDurationChange={(duration) => handleDurationChange("music", duration)}
             onSwitchLayer={() => handleIndividualLayerSwitch("music")}
+            subtitle={
+              musicMode === "tag-shuffle" && currentTrackInfo
+                ? `Track ${currentTrackInfo.index + 1}/${currentTrackInfo.total} • ${currentTrackInfo.name}`
+                : undefined
+            }
+            onActionButton={
+              musicMode === "tag-shuffle" && currentTrackInfo
+                ? handleSkipTrack
+                : undefined
+            }
+            actionButtonIcon={SkipForward}
+            actionButtonTitle="Skip to next track"
           />
         </section>
-
-        {/* Music Playback Mode */}
-        <Section className="p-3">
-          <div className="font-semibold mb-3" style={{ color: theme.text }}>
-            Music Playback
-          </div>
-          <MusicModeSelector
-            mode={musicMode}
-            selectedTag={selectedMusicTag}
-            availableTags={musicTags}
-            currentTrack={currentTrackInfo}
-            onModeChange={handleMusicModeChange}
-            onTagSelect={handleMusicTagSelect}
-            onSkipTrack={handleSkipTrack}
-          />
-        </Section>
 
         {/* Layer Pickers */}
         <LayerPicker
@@ -918,6 +911,7 @@ function App() {
           items={audioLibrary.music}
           currentSelection={currentLayers.music}
           onSelect={(item) => handleLayerSelect("music", item)}
+          onSelectTag={handleTagSelect}
         />
 
         {/* Scene Manager */}

@@ -1,5 +1,5 @@
 import React from "react";
-import { CornerDownRight } from "lucide-react";
+import { CornerDownRight, SkipForward } from "lucide-react";
 import { theme } from "../theme";
 
 interface LayerTileProps {
@@ -11,6 +11,10 @@ interface LayerTileProps {
   onPick?: () => void;
   onDurationChange?: (duration: number) => void;
   onSwitchLayer?: () => void;
+  subtitle?: string; // Optional extra info line (e.g., "Track 2/5" for shuffle)
+  onActionButton?: () => void; // Optional action button (e.g., skip track)
+  actionButtonIcon?: React.ComponentType<{ className?: string }>;
+  actionButtonTitle?: string;
 }
 
 export const LayerTile: React.FC<LayerTileProps> = ({
@@ -21,7 +25,11 @@ export const LayerTile: React.FC<LayerTileProps> = ({
   defaultDuration,
   onPick,
   onDurationChange,
-  onSwitchLayer
+  onSwitchLayer,
+  subtitle,
+  onActionButton,
+  actionButtonIcon: ActionIcon,
+  actionButtonTitle,
 }) => {
   const hasQueuedValue = queued !== undefined;
   const isQueuedNull = queued?.layer === null;
@@ -88,14 +96,43 @@ export const LayerTile: React.FC<LayerTileProps> = ({
           <div className="text-xs opacity-80" style={{ color: theme.textMuted }}>
             {selected ? selected.name : "No selection yet"}
           </div>
+          {subtitle && (
+            <div className="text-xs mt-0.5" style={{ color: theme.primary }}>
+              {subtitle}
+            </div>
+          )}
           {hasQueuedValue && (
             <div className="text-xs mt-1" style={{ color: theme.accent }}>
               Queued: {isQueuedNull ? "No Sound" : queued.layer?.name}
             </div>
           )}
         </div>
-        <div className="text-xs" style={{ color: theme.accent }}>
-          Change
+        <div className="flex items-center gap-2">
+          {onActionButton && ActionIcon && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onActionButton();
+              }}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{
+                background: theme.bgSoft,
+                color: theme.primary,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = theme.bg;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = theme.bgSoft;
+              }}
+              title={actionButtonTitle}
+            >
+              <ActionIcon className="w-4 h-4" />
+            </button>
+          )}
+          <div className="text-xs" style={{ color: theme.accent }}>
+            Change
+          </div>
         </div>
       </button>
 
