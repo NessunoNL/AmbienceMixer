@@ -113,6 +113,7 @@ function App() {
     volume: file.volume,
     duration: file.duration,
     format: file.format,
+    tags: file.tags,
   });
 
   // Scene management handlers - now using backend API
