@@ -60,7 +60,6 @@ function App() {
   const [temporaryOneShots, setTemporaryOneShots] = useState<OneShot[] | null>(null);
 
   // Music tags and playback mode
-  const [musicTags, setMusicTags] = useState<MusicTag[]>([]);
   const [musicMode, setMusicMode] = useState<MusicPlaybackMode>("single-loop");
   const [selectedMusicTag, setSelectedMusicTag] = useState<MusicTag | null>(null);
   const [currentTrackInfo, setCurrentTrackInfo] = useState<{ name: string; index: number; total: number } | null>(null);
@@ -189,10 +188,6 @@ function App() {
         };
         setAudioLibrary(convertedLibrary);
 
-        // Load music tags
-        const tags = await api.getAllMusicTags();
-        setMusicTags(tags);
-
         // Load scenes from backend
         const backendScenes = await api.getScenes();
         setScenes(backendScenes);
@@ -221,9 +216,6 @@ function App() {
         oneshots: library.oneshots.map(convertAudioFile),
       };
       setAudioLibrary(convertedLibrary);
-
-      const tags = await api.getAllMusicTags();
-      setMusicTags(tags);
     } catch (error) {
       console.error("Failed to reload library:", error);
     }

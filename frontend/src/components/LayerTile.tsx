@@ -1,5 +1,5 @@
 import React from "react";
-import { CornerDownRight, SkipForward } from "lucide-react";
+import { CornerDownRight } from "lucide-react";
 import { theme } from "../theme";
 
 interface LayerTileProps {
