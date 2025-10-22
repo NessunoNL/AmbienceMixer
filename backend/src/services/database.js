@@ -46,8 +46,14 @@ class DatabaseService {
   // Audio files methods
   insertAudioFile(audioData) {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO audio_files (path, name, category, duration, format, file_size)
+      INSERT INTO audio_files (path, name, category, duration, format, file_size)
       VALUES (@path, @name, @category, @duration, @format, @file_size)
+      ON CONFLICT(path) DO UPDATE SET
+        name = excluded.name,
+        category = excluded.category,
+        duration = excluded.duration,
+        format = excluded.format,
+        file_size = excluded.file_size
     `);
     return stmt.run(audioData);
   }
