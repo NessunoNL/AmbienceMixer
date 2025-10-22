@@ -64,6 +64,7 @@ function App() {
   const [selectedMusicTag, setSelectedMusicTag] = useState<MusicTag | null>(null);
   const [currentTrackInfo, setCurrentTrackInfo] = useState<{ name: string; index: number; total: number } | null>(null);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
+  const [queuedMusicTag, setQueuedMusicTag] = useState<{ tag: MusicTag; duration: number } | null>(null);
 
   // Track current layer selections (independent of scenes) - load from localStorage
   const [currentLayers, setCurrentLayers] = useState<{
@@ -420,15 +421,9 @@ function App() {
     }));
   };
 
-  // Handle tag selection from music picker
-  const handleTagSelect = async (tag: MusicTag) => {
-    setMusicMode("tag-shuffle");
-    setSelectedMusicTag(tag);
-
-    // Load the playlist if audio is initialized
-    if (audioInitialized) {
-      await loadMusicPlaylist(tag);
-    }
+  // Handle tag selection from music picker - queue it instead of loading immediately
+  const handleTagSelect = (tag: MusicTag) => {
+    setQueuedMusicTag({ tag, duration: defaultCrossfadeDurations.music });
   };
 
   // Handle crossfade duration change for a queued layer
@@ -443,6 +438,18 @@ function App() {
   // Handle queue switch - load all queued layers with crossfade
   const handleQueueSwitch = async () => {
     if (!audioEngineRef.current || !audioInitialized) return;
+
+    // Handle queued music tag if present
+    if (queuedMusicTag) {
+      try {
+        await loadMusicPlaylist(queuedMusicTag.tag);
+        setMusicMode("tag-shuffle");
+        setSelectedMusicTag(queuedMusicTag.tag);
+        setQueuedMusicTag(null);
+      } catch (error) {
+        console.error("Failed to load music playlist:", error);
+      }
+    }
 
     // Load all queued layers in parallel with crossfade
     const loadPromises = Object.entries(queuedLayers).map(([layerType, queuedItem]) => {
@@ -482,6 +489,25 @@ function App() {
   // Handle individual layer switch
   const handleIndividualLayerSwitch = async (layer: LayerType) => {
     if (!audioEngineRef.current || !audioInitialized) return;
+
+    // Special handling for music layer with queued tag
+    if (layer === "music" && queuedMusicTag) {
+      try {
+        await loadMusicPlaylist(queuedMusicTag.tag);
+        setMusicMode("tag-shuffle");
+        setSelectedMusicTag(queuedMusicTag.tag);
+        setQueuedMusicTag(null);
+        // Clear regular music queue if it exists
+        setQueuedLayers((prev) => {
+          const updated = { ...prev };
+          delete updated.music;
+          return updated;
+        });
+      } catch (error) {
+        console.error("Failed to switch to tag playlist:", error);
+      }
+      return;
+    }
 
     const queuedItem = queuedLayers[layer];
     if (!queuedItem) return;
@@ -740,7 +766,7 @@ function App() {
               Scenes
             </div>
             <div className="flex items-center gap-2">
-              {Object.keys(queuedLayers).length > 0 && (
+              {(Object.keys(queuedLayers).length > 0 || queuedMusicTag) && (
                 <button
                   onClick={handleQueueSwitch}
                   className="flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-medium transition-colors"
@@ -756,7 +782,7 @@ function App() {
                     e.currentTarget.style.opacity = "1";
                   }}
                 >
-                  Switch ({Object.keys(queuedLayers).length})
+                  Switch ({Object.keys(queuedLayers).length + (queuedMusicTag ? 1 : 0)})
                 </button>
               )}
               <button
@@ -857,13 +883,23 @@ function App() {
             icon={Music}
             selected={
               musicMode === "tag-shuffle" && selectedMusicTag
-                ? { name: `Tag: ${selectedMusicTag.name}` }
+                ? { name: currentTrackInfo?.name || `Tag: ${selectedMusicTag.name}` }
                 : currentLayers.music
             }
-            queued={queuedLayers.music}
+            queued={
+              queuedMusicTag
+                ? { layer: { name: `Tag: ${queuedMusicTag.tag.name}` }, duration: queuedMusicTag.duration }
+                : queuedLayers.music
+            }
             defaultDuration={defaultCrossfadeDurations.music}
             onPick={() => setPickerOpen("music")}
-            onDurationChange={(duration) => handleDurationChange("music", duration)}
+            onDurationChange={(duration) => {
+              if (queuedMusicTag) {
+                setQueuedMusicTag({ ...queuedMusicTag, duration });
+              } else {
+                handleDurationChange("music", duration);
+              }
+            }}
             onSwitchLayer={() => handleIndividualLayerSwitch("music")}
             subtitle={
               musicMode === "tag-shuffle" && currentTrackInfo
