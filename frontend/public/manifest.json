@@ -4,8 +4,9 @@
   "description": "Mobile-first web app for Dungeon Masters to control music and ambient sounds during tabletop RPG sessions",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#2d353b",
-  "theme_color": "#2d353b",
+  "display_override": ["standalone", "fullscreen"],
+  "background_color": "#2B3339",
+  "theme_color": "#2B3339",
   "orientation": "portrait",
   "icons": [
     {
