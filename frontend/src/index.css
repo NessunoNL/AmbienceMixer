@@ -8,12 +8,21 @@
 
 html {
   background-color: #2B3339;
+  /* Helps avoid white flashes behind overscroll on Android */
+  overscroll-behavior: none;
 }
 
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  /* Use small viewport to include system UI insets */
+  min-height: 100svh;
+  background-color: #2B3339;
+  /* Ensure background fills around gesture/navigation areas */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+#root {
   background-color: #2B3339;
 }
 
