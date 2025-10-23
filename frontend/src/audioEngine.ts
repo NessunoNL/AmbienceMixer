@@ -15,11 +15,16 @@ export class AudioEngine {
   private masterGain: GainNode;
   private musicPlaylist: MusicPlaylist | null = null;
   private readonly MAX_ONESHOTS = 10;
+  private onTrackChangeCallback: (() => void) | null = null;
 
   constructor() {
     this.audioContext = new AudioContext();
     this.masterGain = this.audioContext.createGain();
     this.masterGain.connect(this.audioContext.destination);
+  }
+
+  setOnTrackChange(callback: (() => void) | null): void {
+    this.onTrackChangeCallback = callback;
   }
 
   async loadLayer(type: LayerType, url: string, volume: number = 1, crossfadeDuration: number = 1.5): Promise<void> {
@@ -308,6 +313,11 @@ export class AudioEngine {
         gainNode.gain.cancelScheduledValues(fadeStartTime);
         gainNode.gain.setValueAtTime(0, fadeStartTime);
         gainNode.gain.setTargetAtTime(volume, fadeStartTime, timeConstant);
+      }
+
+      // Notify that track has changed
+      if (this.onTrackChangeCallback) {
+        this.onTrackChangeCallback();
       }
     } catch (error) {
       console.error("Failed to load playlist track:", error);

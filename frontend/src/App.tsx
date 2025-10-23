@@ -174,6 +174,11 @@ function App() {
   // Initialize audio engine
   useEffect(() => {
     audioEngineRef.current = new AudioEngine();
+
+    // Register callback to update track info when playlist advances
+    audioEngineRef.current.setOnTrackChange(() => {
+      updateCurrentTrackInfo();
+    });
   }, []);
 
   // Load audio library and scenes from backend on mount
