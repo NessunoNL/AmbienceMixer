@@ -928,7 +928,7 @@ function App() {
 
             {/* Right Sidebar - One-Shots */}
             <div className="md:w-72 lg:w-80">
-              <Section className="p-2 md:p-3">
+              <Section className="p-2 md:p-3 h-full flex flex-col">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div className="font-semibold text-sm md:text-base">One‑Shots</div>
@@ -998,7 +998,7 @@ function App() {
                     </span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 flex-1 content-start overflow-y-auto">
                   {displayedOneShots.length === 0 ? (
                     <div className="col-span-full text-center py-8" style={{ color: theme.textMuted }}>
                       <p className="text-sm">No one-shots available for this scene.</p>
