@@ -11,8 +11,10 @@ export class AudioEngine {
   private audioContext: AudioContext;
   private layers: Map<LayerType, AudioLayerInstance> = new Map();
   private fadingOutLayers: Set<AudioLayerInstance> = new Set();
+  private activeOneShots: Set<OneShotInstance> = new Set();
   private masterGain: GainNode;
   private musicPlaylist: MusicPlaylist | null = null;
+  private readonly MAX_ONESHOTS = 10;
 
   constructor() {
     this.audioContext = new AudioContext();
@@ -179,24 +181,48 @@ export class AudioEngine {
 
   async playOneShot(url: string, volume: number = 0.8): Promise<void> {
     try {
-      // Play one-shot
-      const response = await fetch(url);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      // Enforce max concurrent one-shots limit
+      if (this.activeOneShots.size >= this.MAX_ONESHOTS) {
+        // Remove oldest one-shot
+        const oldest = this.activeOneShots.values().next().value;
+        if (oldest) {
+          this.cleanupOneShot(oldest);
+        }
+      }
 
-      const source = this.audioContext.createBufferSource();
-      source.buffer = audioBuffer;
+      // Use streaming playback (no download/decode delay)
+      const audio = new Audio(url);
+      audio.preload = "auto";
 
+      const source = this.audioContext.createMediaElementSource(audio);
       const gainNode = this.audioContext.createGain();
       gainNode.gain.value = volume;
 
       source.connect(gainNode);
       gainNode.connect(this.masterGain);
 
-      source.start(0);
+      const instance = new OneShotInstance(source, gainNode, audio);
+      this.activeOneShots.add(instance);
+
+      // Auto-cleanup when playback completes
+      audio.addEventListener("ended", () => {
+        this.cleanupOneShot(instance);
+      });
+
+      await audio.play();
     } catch (error) {
       console.error("Failed to play one-shot:", error);
     }
+  }
+
+  private cleanupOneShot(instance: OneShotInstance): void {
+    if (instance.audio) {
+      instance.audio.pause();
+      instance.audio.currentTime = 0;
+    }
+    instance.gainNode.disconnect();
+    instance.source.disconnect();
+    this.activeOneShots.delete(instance);
   }
 
   async loadMusicPlaylist(urls: string[], volume: number = 1, shuffle: boolean = true): Promise<void> {
@@ -348,5 +374,21 @@ class AudioLayerInstance {
     this.gainNode = gainNode;
     this.audioElement = audioElement;
     this.onEnded = onEnded;
+  }
+}
+
+class OneShotInstance {
+  source: MediaElementAudioSourceNode;
+  gainNode: GainNode;
+  audio: HTMLAudioElement;
+
+  constructor(
+    source: MediaElementAudioSourceNode,
+    gainNode: GainNode,
+    audio: HTMLAudioElement
+  ) {
+    this.source = source;
+    this.gainNode = gainNode;
+    this.audio = audio;
   }
 }
