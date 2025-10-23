@@ -1080,8 +1080,6 @@ function App() {
           musicFiles={audioLibrary.music}
           onTagsUpdated={handleTagsUpdated}
         />
-        </>
-        )}
       </main>
     </div>
   );
