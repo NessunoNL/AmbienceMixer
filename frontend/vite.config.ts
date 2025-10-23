@@ -13,8 +13,8 @@ export default defineConfig({
         name: 'Ambience Mixer',
         short_name: 'Ambience',
         description: 'Mobile-first web app for Dungeon Masters to control music and ambient sounds during tabletop RPG sessions',
-        theme_color: '#2d353b',
-        background_color: '#2d353b',
+        theme_color: '#2B3339',
+        background_color: '#2B3339',
         display: 'standalone',
         orientation: 'any',
         icons: [
