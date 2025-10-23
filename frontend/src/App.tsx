@@ -682,7 +682,7 @@ function App() {
       }}
       onClick={initializeAudio}
     >
-      <main className="mx-auto max-w-5xl px-4 py-6 space-y-6">
+      <main className="mx-auto max-w-7xl px-4 py-6 space-y-4">
         {/* Header */}
         <div className="text-center mb-4">
           <div className="flex items-center justify-center gap-4 mb-2">
@@ -765,10 +765,11 @@ function App() {
             Loading...
           </div>
         ) : (
-          <>
-
-        {/* Scenes Section */}
-        <Section className="p-3">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
+            {/* Left Column - Main Controls */}
+            <div className="space-y-4">
+              {/* Scenes Section */}
+              <Section className="p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="font-semibold" style={{ color: theme.text }}>
               Scenes
@@ -864,65 +865,163 @@ function App() {
           />
         </section>
 
-        {/* Layer Tiles */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <LayerTile
-            label="Environment"
-            icon={Trees}
-            selected={currentLayers.environment}
-            queued={queuedLayers.environment}
-            defaultDuration={defaultCrossfadeDurations.environment}
-            onPick={() => setPickerOpen("environment")}
-            onDurationChange={(duration) => handleDurationChange("environment", duration)}
-            onSwitchLayer={() => handleIndividualLayerSwitch("environment")}
-          />
-          <LayerTile
-            label="Weather"
-            icon={CloudRain}
-            selected={currentLayers.weather}
-            queued={queuedLayers.weather}
-            defaultDuration={defaultCrossfadeDurations.weather}
-            onPick={() => setPickerOpen("weather")}
-            onDurationChange={(duration) => handleDurationChange("weather", duration)}
-            onSwitchLayer={() => handleIndividualLayerSwitch("weather")}
-          />
-          <LayerTile
-            label="Music"
-            icon={Music}
-            selected={
-              musicMode === "tag-shuffle" && selectedMusicTag
-                ? { name: currentTrackInfo?.name || `Tag: ${selectedMusicTag.name}` }
-                : currentLayers.music
-            }
-            queued={
-              queuedMusicTag
-                ? { layer: { name: `Tag: ${queuedMusicTag.tag.name}` }, duration: queuedMusicTag.duration }
-                : queuedLayers.music
-            }
-            defaultDuration={defaultCrossfadeDurations.music}
-            onPick={() => setPickerOpen("music")}
-            onDurationChange={(duration) => {
-              if (queuedMusicTag) {
-                setQueuedMusicTag({ ...queuedMusicTag, duration });
-              } else {
-                handleDurationChange("music", duration);
-              }
-            }}
-            onSwitchLayer={() => handleIndividualLayerSwitch("music")}
-            subtitle={
-              musicMode === "tag-shuffle" && currentTrackInfo
-                ? `Track ${currentTrackInfo.index + 1}/${currentTrackInfo.total} • ${currentTrackInfo.name}`
-                : undefined
-            }
-            onActionButton={
-              musicMode === "tag-shuffle" && currentTrackInfo
-                ? handleSkipTrack
-                : undefined
-            }
-            actionButtonIcon={SkipForward}
-            actionButtonTitle="Skip to next track"
-          />
-        </section>
+              {/* Layer Tiles */}
+              <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <LayerTile
+                  label="Environment"
+                  icon={Trees}
+                  selected={currentLayers.environment}
+                  queued={queuedLayers.environment}
+                  defaultDuration={defaultCrossfadeDurations.environment}
+                  onPick={() => setPickerOpen("environment")}
+                  onDurationChange={(duration) => handleDurationChange("environment", duration)}
+                  onSwitchLayer={() => handleIndividualLayerSwitch("environment")}
+                />
+                <LayerTile
+                  label="Weather"
+                  icon={CloudRain}
+                  selected={currentLayers.weather}
+                  queued={queuedLayers.weather}
+                  defaultDuration={defaultCrossfadeDurations.weather}
+                  onPick={() => setPickerOpen("weather")}
+                  onDurationChange={(duration) => handleDurationChange("weather", duration)}
+                  onSwitchLayer={() => handleIndividualLayerSwitch("weather")}
+                />
+                <LayerTile
+                  label="Music"
+                  icon={Music}
+                  selected={
+                    musicMode === "tag-shuffle" && selectedMusicTag
+                      ? { name: currentTrackInfo?.name || `Tag: ${selectedMusicTag.name}` }
+                      : currentLayers.music
+                  }
+                  queued={
+                    queuedMusicTag
+                      ? { layer: { name: `Tag: ${queuedMusicTag.tag.name}` }, duration: queuedMusicTag.duration }
+                      : queuedLayers.music
+                  }
+                  defaultDuration={defaultCrossfadeDurations.music}
+                  onPick={() => setPickerOpen("music")}
+                  onDurationChange={(duration) => {
+                    if (queuedMusicTag) {
+                      setQueuedMusicTag({ ...queuedMusicTag, duration });
+                    } else {
+                      handleDurationChange("music", duration);
+                    }
+                  }}
+                  onSwitchLayer={() => handleIndividualLayerSwitch("music")}
+                  subtitle={
+                    musicMode === "tag-shuffle" && currentTrackInfo
+                      ? `Track ${currentTrackInfo.index + 1}/${currentTrackInfo.total} • ${currentTrackInfo.name}`
+                      : undefined
+                  }
+                  onActionButton={
+                    musicMode === "tag-shuffle" && currentTrackInfo
+                      ? handleSkipTrack
+                      : undefined
+                  }
+                  actionButtonIcon={SkipForward}
+                  actionButtonTitle="Skip to next track"
+                />
+              </section>
+            </div>
+
+            {/* Right Sidebar - One-Shots */}
+            <div className="md:w-72 lg:w-80">
+              <Section className="p-2 md:p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="font-semibold text-sm md:text-base">One‑Shots</div>
+                    {temporaryOneShots && (
+                      <span className="text-xs px-2 py-0.5 rounded" style={{ background: theme.accent, color: theme.bg }}>
+                        Customized
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {temporaryOneShots && (
+                      <button
+                        onClick={handleClearTemporaryOneShots}
+                        className="text-xs px-2 py-1 rounded-lg transition-colors"
+                        style={{
+                          background: theme.card,
+                          color: theme.textMuted,
+                          border: `1px solid rgba(0, 0, 0, 0.25)`,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = theme.bgSoft;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = theme.card;
+                        }}
+                      >
+                        Reset
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setOneShotPickerOpen(true)}
+                      className="text-xs px-2 py-1 rounded-lg transition-colors"
+                      style={{
+                        background: theme.card,
+                        color: theme.accent,
+                        border: `1px solid rgba(0, 0, 0, 0.25)`,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = theme.bgSoft;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = theme.card;
+                      }}
+                    >
+                      Customize
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs" style={{ color: theme.textMuted }}>
+                    Volume
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={oneShotVolume}
+                      onChange={(e) => setOneShotVolume(Number(e.target.value))}
+                      className="w-20 h-1 rounded-full appearance-none cursor-pointer"
+                      style={{
+                        background: `linear-gradient(to right, ${theme.primary} 0%, ${theme.primary} ${oneShotVolume}%, rgba(255,255,255,0.12) ${oneShotVolume}%, rgba(255,255,255,0.12) 100%)`,
+                      }}
+                    />
+                    <span className="text-xs w-8" style={{ color: theme.textMuted }}>
+                      {oneShotVolume}%
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {displayedOneShots.length === 0 ? (
+                    <div className="col-span-full text-center py-8" style={{ color: theme.textMuted }}>
+                      <p className="text-sm">No one-shots available for this scene.</p>
+                      <p className="text-xs mt-2">Click "Customize" to add some.</p>
+                    </div>
+                  ) : (
+                    displayedOneShots.map((oneshot) => {
+                      const OneShotIcon = iconMap[oneshot.icon];
+                      return (
+                        <OneShotButton
+                          key={oneshot.id}
+                          name={oneshot.name}
+                          icon={OneShotIcon}
+                          onTrigger={() => handleOneShotTrigger(oneshot.url)}
+                        />
+                      );
+                    })
+                  )}
+                </div>
+              </Section>
+            </div>
+          </div>
+        )}
 
         {/* Layer Pickers */}
         <LayerPicker
@@ -963,95 +1062,6 @@ function App() {
           onSaveScene={handleSaveScene}
           onDeleteScene={handleDeleteScene}
         />
-
-        {/* One-Shots */}
-        <Section className="p-3">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="font-semibold">One‑Shots</div>
-              {temporaryOneShots && (
-                <span className="text-xs px-2 py-0.5 rounded" style={{ background: theme.accent, color: theme.bg }}>
-                  Customized
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {temporaryOneShots && (
-                <button
-                  onClick={handleClearTemporaryOneShots}
-                  className="text-xs px-2 py-1 rounded-lg transition-colors"
-                  style={{
-                    background: theme.card,
-                    color: theme.textMuted,
-                    border: `1px solid rgba(0, 0, 0, 0.25)`,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = theme.bgSoft;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = theme.card;
-                  }}
-                >
-                  Reset
-                </button>
-              )}
-              <button
-                onClick={() => setOneShotPickerOpen(true)}
-                className="text-xs px-2 py-1 rounded-lg transition-colors"
-                style={{
-                  background: theme.card,
-                  color: theme.accent,
-                  border: `1px solid rgba(0, 0, 0, 0.25)`,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = theme.bgSoft;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = theme.card;
-                }}
-              >
-                Customize
-              </button>
-              <span className="text-xs" style={{ color: theme.textMuted }}>
-                Volume
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={oneShotVolume}
-                onChange={(e) => setOneShotVolume(Number(e.target.value))}
-                className="w-24 h-1 rounded-full appearance-none cursor-pointer"
-                style={{
-                  background: `linear-gradient(to right, ${theme.primary} 0%, ${theme.primary} ${oneShotVolume}%, rgba(255,255,255,0.12) ${oneShotVolume}%, rgba(255,255,255,0.12) 100%)`,
-                }}
-              />
-              <span className="text-xs w-8" style={{ color: theme.textMuted }}>
-                {oneShotVolume}%
-              </span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {displayedOneShots.length === 0 ? (
-              <div className="col-span-full text-center py-8" style={{ color: theme.textMuted }}>
-                <p>No one-shots available for this scene.</p>
-                <p className="text-sm mt-2">Click "Customize" to add some.</p>
-              </div>
-            ) : (
-              displayedOneShots.map((oneshot) => {
-                const OneShotIcon = iconMap[oneshot.icon];
-                return (
-                  <OneShotButton
-                    key={oneshot.id}
-                    name={oneshot.name}
-                    icon={OneShotIcon}
-                    onTrigger={() => handleOneShotTrigger(oneshot.url)}
-                  />
-                );
-              })
-            )}
-          </div>
-        </Section>
 
         {/* One-Shot Picker */}
         <OneShotPicker
