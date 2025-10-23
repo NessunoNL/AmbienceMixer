@@ -375,9 +375,12 @@ function App() {
         return;
       }
 
-      const urls = files.map(file => api.getAudioStreamUrl(file.id));
+      const tracks = files.map(file => ({
+        url: api.getAudioStreamUrl(file.id),
+        name: file.name
+      }));
       await audioEngineRef.current.loadMusicPlaylist(
-        urls,
+        tracks,
         muted.music ? 0 : volumes.music / 100,
         true // shuffle
       );

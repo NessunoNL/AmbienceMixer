@@ -1,7 +1,7 @@
 import type { LayerType } from "./types";
 
 interface MusicPlaylist {
-  urls: string[];
+  tracks: Array<{ url: string; name: string }>;
   currentIndex: number;
   shuffle: boolean;
   volume: number;
@@ -225,15 +225,15 @@ export class AudioEngine {
     this.activeOneShots.delete(instance);
   }
 
-  async loadMusicPlaylist(urls: string[], volume: number = 1, shuffle: boolean = true): Promise<void> {
-    if (urls.length === 0) {
+  async loadMusicPlaylist(tracks: Array<{ url: string; name: string }>, volume: number = 1, shuffle: boolean = true): Promise<void> {
+    if (tracks.length === 0) {
       throw new Error("Cannot load empty playlist");
     }
 
     // Initialize playlist
-    const playOrder = shuffle ? this.shuffleArray([...urls]) : urls;
+    const playOrder = shuffle ? this.shuffleArray([...tracks]) : tracks;
     this.musicPlaylist = {
-      urls: playOrder,
+      tracks: playOrder,
       currentIndex: 0,
       shuffle,
       volume,
@@ -244,11 +244,11 @@ export class AudioEngine {
   }
 
   private async loadPlaylistTrack(index: number, volume: number, crossfadeDuration: number = 1.5): Promise<void> {
-    if (!this.musicPlaylist || index >= this.musicPlaylist.urls.length) {
+    if (!this.musicPlaylist || index >= this.musicPlaylist.tracks.length) {
       return;
     }
 
-    const url = this.musicPlaylist.urls[index];
+    const url = this.musicPlaylist.tracks[index].url;
     this.musicPlaylist.currentIndex = index;
 
     // Get existing music layer
@@ -319,11 +319,11 @@ export class AudioEngine {
   async playNextTrack(): Promise<void> {
     if (!this.musicPlaylist) return;
 
-    const nextIndex = (this.musicPlaylist.currentIndex + 1) % this.musicPlaylist.urls.length;
+    const nextIndex = (this.musicPlaylist.currentIndex + 1) % this.musicPlaylist.tracks.length;
 
     // If we've completed the playlist and shuffle is on, reshuffle
     if (nextIndex === 0 && this.musicPlaylist.shuffle) {
-      this.musicPlaylist.urls = this.shuffleArray([...this.musicPlaylist.urls]);
+      this.musicPlaylist.tracks = this.shuffleArray([...this.musicPlaylist.tracks]);
     }
 
     await this.loadPlaylistTrack(nextIndex, this.musicPlaylist.volume, 2.0);
@@ -332,13 +332,12 @@ export class AudioEngine {
   getCurrentTrackInfo(): { name: string; index: number; total: number } | null {
     if (!this.musicPlaylist) return null;
 
-    const url = this.musicPlaylist.urls[this.musicPlaylist.currentIndex];
-    const name = url.split('/').pop()?.replace(/\.[^/.]+$/, '') || "Unknown Track";
+    const track = this.musicPlaylist.tracks[this.musicPlaylist.currentIndex];
 
     return {
-      name,
+      name: track.name,
       index: this.musicPlaylist.currentIndex,
-      total: this.musicPlaylist.urls.length,
+      total: this.musicPlaylist.tracks.length,
     };
   }
 
