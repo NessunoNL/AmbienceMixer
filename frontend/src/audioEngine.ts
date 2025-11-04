@@ -131,6 +131,11 @@ export class AudioEngine {
     layer.gainNode.gain.cancelScheduledValues(currentTime);
     layer.gainNode.gain.setValueAtTime(layer.gainNode.gain.value, currentTime);
     layer.gainNode.gain.setTargetAtTime(volume, currentTime, timeConstant);
+
+    // Sync playlist volume if this is music layer with active playlist
+    if (type === "music" && this.musicPlaylist) {
+      this.musicPlaylist.volume = volume;
+    }
   }
 
   async stopLayer(type: LayerType, fadeOut: boolean = true, fadeDuration: number = 0.5): Promise<void> {
