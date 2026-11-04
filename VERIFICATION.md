@@ -47,3 +47,11 @@ Open **http://192.168.2.60:5174** on the tablet while connected to the same LAN 
 Begin with Rain and the soundtrack, then Apply all. Prepare Quiet and verify Rain continues until Apply scene. Swipe volume sideways, scroll vertically over the card, try Next and master mute. Report any action that sounds abrupt or behaves unexpectedly. This library currently has only one ambience: full multiple-distinct-ambience stress remains pending.
 
 HTTP health/page/ranged audio responses have been checked from the desktop. Tablet access and actual playback are not verified yet. This HTTP LAN preview may not support wake lock or PWA installation; use a separately arranged trusted HTTPS preview for those checks. No security-warning bypass is part of the test.
+
+## Homelab publication — 2026-11-04
+
+Published the mockup-based mixer via `scripts/deploy` from a clean temporary checkout; unrelated local editor/CLAUDE changes were preserved. Live URL: https://ambience.home.brouwerhomelab.nl. Health passed and the normal HTTPS page loaded the new UI with existing scenes/moods. Browser Apply started real NAS environment and music streams (media readyState 4); Next advanced the queue. No saved scenes or library assignments were changed by these smoke checks.
+
+Retained database backup: `/opt/docker/AmbienceMixer/data/ambience.db.backup-20261104T140752Z`. Previous image: `ambience-mixer:rollback-20261104T140752Z`. Rollback override: `.local/deploy/rollback-20261104T140752Z.yml` in the server checkout. Database restore remains a separate decision.
+
+The live library contains 63 files: 16 environments, 28 music tracks, 18 one-shots, and **one ambience** in the existing `weather` folder. The full library is available, but this is not a large-ambience-library stress test. Physical tablet, audible smoothness and long-session checks remain open.

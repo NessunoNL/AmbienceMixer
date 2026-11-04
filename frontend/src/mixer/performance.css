@@ -65,3 +65,5 @@ body:has(.mockup-app){padding:0;overflow:hidden}
 #scene-mood .picker-item:has(:checked){background:var(--soft);border-color:var(--green)}
 #scene-mood .sheet-filters{max-height:100px;overflow:auto}
 @media(max-width:650px){#scene-mood .picker-results{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Short landscape screens expose the rest of the queue through Full queue. */
+@media(max-height:760px) and (min-width:801px){#scene-mood .songs>.song:nth-child(n+2){display:none}}
