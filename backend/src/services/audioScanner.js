@@ -6,88 +6,94 @@ import db from './database.js';
 const AUDIO_DIR = process.env.AUDIO_DIR || '/app/audio';
 const SUPPORTED_FORMATS = ['.mp3', '.wav'];
 
-class AudioScanner {
-  async scanDirectory() {
-    console.log(`🔍 Scanning audio directory: ${AUDIO_DIR}`);
+export class AudioScanner {
+  constructor(audioDir = AUDIO_DIR) {
+    this.audioDir = audioDir;
+    this.pendingScan = null;
+  }
+
+  // Startup and manual rescans share one operation, avoiding overlapping snapshots.
+  scanDirectory() {
+    if (!this.pendingScan) {
+      this.pendingScan = this.performScan().finally(() => { this.pendingScan = null; });
+    }
+    return this.pendingScan;
+  }
+
+  async performScan() {
+    console.log(`Scanning audio directory: ${this.audioDir}`);
     const startTime = Date.now();
-
-    // Note: Using UPSERT to preserve IDs - scenes remain valid after rescans
-    // Track scanned paths to identify deleted files
     const scannedPaths = new Set();
+    const completeCategories = new Set();
+    const updates = [];
+    const warnings = [];
+    const warn = (category, error, file) => {
+      const warning = { category, ...(file ? { file } : {}), message: error.message };
+      warnings.push(warning);
+      console.warn('Audio scan incomplete:', warning);
+    };
 
-    const categories = ['environment', 'weather', 'music', 'oneshots'];
-    let totalFiles = 0;
-
-    for (const category of categories) {
-      const categoryPath = join(AUDIO_DIR, category);
-
+    for (const category of ['environment', 'weather', 'music', 'oneshots']) {
+      const categoryPath = join(this.audioDir, category);
+      let files;
       try {
-        const files = readdirSync(categoryPath);
-
-        for (const file of files) {
-          const filePath = join(categoryPath, file);
-          const ext = extname(file).toLowerCase();
-
-          if (!SUPPORTED_FORMATS.includes(ext)) {
-            continue;
-          }
-
-          try {
-            const stats = statSync(filePath);
-            const metadata = await this.extractMetadata(filePath);
-
-            const audioPath = `/audio/${category}/${file}`;
-            const audioData = {
-              path: audioPath,
-              name: this.formatFileName(basename(file, ext)),
-              category,
-              duration: metadata.duration || null,
-              format: ext.substring(1), // Remove the dot
-              file_size: stats.size,
-            };
-
-            db.insertAudioFile(audioData);
-            scannedPaths.add(audioPath);
-            totalFiles++;
-            console.log(`  ✓ ${category}/${file}`);
-          } catch (err) {
-            console.error(`  ✗ Failed to process ${category}/${file}:`, err.message);
-          }
+        files = readdirSync(categoryPath);
+      } catch (error) {
+        warn(category, error);
+        continue;
+      }
+      let complete = true;
+      for (const file of files) {
+        const ext = extname(file).toLowerCase();
+        if (!SUPPORTED_FORMATS.includes(ext)) continue;
+        const filePath = join(categoryPath, file);
+        const audioPath = `/audio/${category}/${file}`;
+        // Presence is independent of whether metadata can be read successfully.
+        scannedPaths.add(audioPath);
+        try {
+          const stats = statSync(filePath);
+          if (!stats.isFile()) continue; // Library folders remain flat.
+          const metadata = await this.extractMetadata(filePath);
+          updates.push({
+            path: audioPath,
+            name: this.formatFileName(basename(file, extname(file))),
+            category,
+            duration: metadata.duration ?? null,
+            format: ext.substring(1),
+            file_size: stats.size,
+          });
+        } catch (error) {
+          complete = false;
+          warn(category, error, file);
         }
-      } catch (err) {
-        console.warn(`  ⚠ Category folder not found: ${category}`);
       }
+      if (complete) completeCategories.add(category);
     }
 
-    // Remove files from database that no longer exist on filesystem
-    const existingFiles = db.getAllAudioFiles();
-    let deletedCount = 0;
-    for (const file of existingFiles) {
-      if (!scannedPaths.has(file.path)) {
-        db.deleteAudioFileByPath(file.path);
-        deletedCount++;
-        console.log(`  🗑 Removed: ${file.path}`);
+    // Commit once after asynchronous I/O. A failed DB write cannot leave a half scan.
+    const deletedCount = db.db.transaction(() => {
+      for (const audio of updates) db.insertAudioFile(audio);
+      let removed = 0;
+      for (const file of db.getAllAudioFiles()) {
+        if (completeCategories.has(file.category) && !scannedPaths.has(file.path)) {
+          db.deleteAudioFileByPath(file.path);
+          removed++;
+        }
       }
-    }
-
-    const duration = Date.now() - startTime;
-    console.log(`✓ Scan complete: ${totalFiles} files indexed, ${deletedCount} removed in ${duration}ms`);
-
-    return { totalFiles, deletedCount, duration };
+      return removed;
+    })();
+    const result = {
+      totalFiles: updates.length, deletedCount, duration: Date.now() - startTime,
+      partial: warnings.length > 0, warnings,
+    };
+    console.log('Audio scan finished:', result);
+    return result;
   }
 
   async extractMetadata(filePath) {
-    try {
-      const metadata = await parseFile(filePath, { duration: true });
-      return {
-        duration: metadata.format.duration,
-        bitrate: metadata.format.bitrate,
-        sampleRate: metadata.format.sampleRate,
-      };
-    } catch (err) {
-      console.warn(`Could not extract metadata from ${filePath}:`, err.message);
-      return {};
-    }
+    // Let failures reach the scan policy; never overwrite good metadata with {}.
+    const metadata = await parseFile(filePath, { duration: true });
+    return { duration: metadata.format.duration };
   }
 
   formatFileName(name) {
@@ -101,6 +107,7 @@ class AudioScanner {
 
   getLibrary() {
     const files = db.getAllAudioFiles();
+    const categories = new Map(db.getSoundCategories().map(category => [category.id, category]));
 
     // Group by category
     const library = {
@@ -118,6 +125,8 @@ class AudioScanner {
         duration: file.duration,
         format: file.format,
         volume: 0.7, // Default volume
+        soundCategoryId: file.sound_category_id ?? null,
+        soundCategory: categories.get(file.sound_category_id) ?? null,
       };
 
       // Add tags for music files

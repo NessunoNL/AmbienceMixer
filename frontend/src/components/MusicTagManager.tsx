@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Plus, Tag, Trash2, Check } from "lucide-react";
 import { theme } from "../theme";
 import type { MusicTag, AudioLayer } from "../types";
@@ -17,6 +17,15 @@ export function MusicTagManager({
   musicFiles,
   onTagsUpdated,
 }: MusicTagManagerProps) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const element = dialog.current!; element.showModal();
+    return () => { element.close(); previous?.focus(); };
+  }, [isOpen]);
+
+  const [error, setError] = useState("");
   const [allTags, setAllTags] = useState<MusicTag[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [selectedTag, setSelectedTag] = useState<MusicTag | null>(null);
@@ -33,8 +42,10 @@ export function MusicTagManager({
     try {
       const tags = await api.getAllMusicTags();
       setAllTags(tags);
+      setError("");
     } catch (error) {
       console.error("Failed to load tags:", error);
+      setError("Could not load moods. Close and reopen this window to retry.");
     }
   };
 
@@ -131,11 +142,9 @@ export function MusicTagManager({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0, 0, 0, 0.7)" }}
-      onClick={onClose}
-    >
+    <dialog ref={dialog} className="mood-manager" aria-label="Manage music moods"
+      onCancel={event => { event.preventDefault(); onClose(); }}>
+
       <div
         className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl p-6"
         style={{ background: theme.card, color: theme.text }}
@@ -145,10 +154,11 @@ export function MusicTagManager({
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Tag style={{ color: theme.primary }} className="w-5 h-5" />
-            <h2 className="text-xl font-bold">Manage Music Tags</h2>
+            <h2 className="text-xl font-bold">Manage music moods</h2>
           </div>
           <button
             onClick={onClose}
+            aria-label="Close mood manager"
             className="p-1 rounded-lg transition-colors"
             style={{ background: theme.bgSoft }}
             onMouseEnter={(e) => {
@@ -162,9 +172,10 @@ export function MusicTagManager({
           </button>
         </div>
 
-        {/* Create New Tag */}
+        {error && <p role="alert" className="error">{error}</p>}
+        {/* Create new mood */}
         <div className="mb-6 p-4 rounded-lg" style={{ background: theme.bgSoft }}>
-          <h3 className="text-sm font-semibold mb-3">Create New Tag</h3>
+          <h3 className="text-sm font-semibold mb-3">Create new mood</h3>
           <div className="flex gap-2">
             <input
               type="text"
@@ -173,7 +184,7 @@ export function MusicTagManager({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleCreateTag();
               }}
-              placeholder="Tag name..."
+              placeholder="Mood name..."
               className="flex-1 px-3 py-2 rounded-lg border-none outline-none"
               style={{ background: theme.card, color: theme.text }}
             />
@@ -203,12 +214,12 @@ export function MusicTagManager({
           </div>
         </div>
 
-        {/* Existing Tags */}
+        {/* Existing moods */}
         <div className="mb-6">
-          <h3 className="text-sm font-semibold mb-3">Existing Tags</h3>
+          <h3 className="text-sm font-semibold mb-3">Existing moods</h3>
           {allTags.length === 0 ? (
             <p className="text-center py-4" style={{ color: theme.textMuted }}>
-              No tags created yet.
+              No moods created yet.
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -221,6 +232,7 @@ export function MusicTagManager({
                   <span>{tag.name}</span>
                   <button
                     onClick={() => handleDeleteTag(tag.id)}
+                    aria-label={`Delete mood ${tag.name}`}
                     className="p-0.5 rounded transition-colors"
                     style={{ color: theme.textMuted }}
                     onMouseEnter={(e) => {
@@ -238,23 +250,23 @@ export function MusicTagManager({
           )}
         </div>
 
-        {/* Bulk Assign Tags */}
+        {/* Assign mood to songs */}
         <div>
-          <h3 className="text-sm font-semibold mb-3">Bulk Assign Tags</h3>
+          <h3 className="text-sm font-semibold mb-3">Assign mood to songs</h3>
           {musicFiles.length === 0 ? (
             <p className="text-center py-4" style={{ color: theme.textMuted }}>
               No music files found.
             </p>
           ) : allTags.length === 0 ? (
             <p className="text-center py-4" style={{ color: theme.textMuted }}>
-              Create a tag first to assign it to files.
+              Create a mood first to assign it to songs.
             </p>
           ) : (
             <>
               {/* Tag Selection */}
               <div className="mb-3 p-3 rounded-lg" style={{ background: theme.bgSoft }}>
                 <label className="text-xs font-medium mb-2 block" style={{ color: theme.textMuted }}>
-                  Select tag to assign:
+                  Select mood to assign:
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {allTags.map((tag) => (
@@ -360,6 +372,6 @@ export function MusicTagManager({
           )}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

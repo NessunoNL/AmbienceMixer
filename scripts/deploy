@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+[[ "$(git branch --show-current)" == master ]] || { echo 'Deploy from master.' >&2; exit 1; }
+[[ -z "$(git status --porcelain)" ]] || { echo 'Commit your changes before deploying.' >&2; exit 1; }
+./scripts/check
+git fetch origin master
+commit="$(git rev-parse HEAD)"
+[[ "$commit" == "$(git rev-parse origin/master)" ]] || { echo 'Push your commit to origin/master before deploying.' >&2; exit 1; }
+ssh -F /dev/null -o BatchMode=yes jacco@192.168.2.5 bash -s -- "$commit" < scripts/deploy-server

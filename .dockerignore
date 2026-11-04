@@ -1,0 +1,7 @@
+.git
+.local
+data
+**/node_modules
+backend/public
+**/*.log
+.env*

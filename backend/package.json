@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
+    "test": "node --test test/*.test.js",
     "dev": "node --watch src/index.js",
     "scan": "node src/services/audioScanner.js"
   },

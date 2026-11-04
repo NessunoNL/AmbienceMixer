@@ -1,11 +1,22 @@
 import express from 'express';
 import db from '../services/database.js';
+import { normalizeScenePayload, SceneValidationError } from '../services/scenePayload.js';
 
 const router = express.Router();
 
 // Helper function to hydrate scene with full audio layer objects
 function hydrateScene(scene) {
   const hydrated = { ...scene };
+
+  hydrated.ambiences = db.getSceneAmbiences(scene.id).map(entry => {
+    const audio = db.getAudioFileById(entry.audioId);
+    return { ...entry, audio: audio ? {
+      id: String(audio.id), name: audio.name,
+      url: `/api/audio/${audio.id}/stream`, volume: entry.volume / 100,
+    } : null };
+  });
+  hydrated.musicMode = scene.music_mode;
+  hydrated.musicTagId = scene.music_tag_id;
 
   // Hydrate environment layer
   if (scene.environment_id) {
@@ -107,78 +118,24 @@ router.get('/:id', (req, res) => {
   }
 });
 
-// Create new scene
-router.post('/', (req, res) => {
+// Create/update use one validated payload and an atomic parent/children write.
+function writeScene(req, res, updating) {
   try {
-    const {
-      id, label, icon,
-      environment_id, weather_id, music_id,
-      oneshots,
-      environmentVolume, weatherVolume, musicVolume
-    } = req.body;
-
-    if (!id || !label || !icon) {
-      return res.status(400).json({ error: 'Missing required fields: id, label, icon' });
-    }
-
-    const sceneData = {
-      id,
-      label,
-      icon,
-      environment_id: environment_id || null,
-      weather_id: weather_id || null,
-      music_id: music_id || null,
-      oneshots: JSON.stringify(oneshots || []),
-      environment_volume: environmentVolume ?? 70,
-      weather_volume: weatherVolume ?? 45,
-      music_volume: musicVolume ?? 60,
-    };
-
-    console.log('[Scene API] Creating scene:', { id, label, volumes: { env: sceneData.environment_volume, weather: sceneData.weather_volume, music: sceneData.music_volume } });
-    db.insertScene(sceneData);
-    res.status(201).json({ success: true, id });
+    const id = updating ? req.params.id : req.body?.id;
+    const existing = updating ? db.getSceneById(id) : undefined;
+    if (updating && !existing) return res.status(404).json({ error: 'Scene not found' });
+    const { scene, ambiences } = normalizeScenePayload(req.body, existing, db, id);
+    if (!updating && db.getSceneById(id)) return res.status(409).json({ error: 'Scene already exists' });
+    db.saveScene(scene, ambiences, updating);
+    return res.status(updating ? 200 : 201).json({ success: true, id });
   } catch (err) {
-    console.error('Error creating scene:', err);
-    res.status(500).json({ error: 'Failed to create scene' });
+    if (err instanceof SceneValidationError) return res.status(400).json({ error: err.message });
+    console.error('Error saving scene:', err);
+    return res.status(500).json({ error: 'Failed to save scene' });
   }
-});
-
-// Update existing scene
-router.put('/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      label, icon,
-      environment_id, weather_id, music_id,
-      oneshots,
-      environmentVolume, weatherVolume, musicVolume
-    } = req.body;
-
-    const existing = db.getSceneById(id);
-    if (!existing) {
-      return res.status(404).json({ error: 'Scene not found' });
-    }
-
-    const sceneData = {
-      label: label || existing.label,
-      icon: icon || existing.icon,
-      environment_id: environment_id !== undefined ? environment_id : existing.environment_id,
-      weather_id: weather_id !== undefined ? weather_id : existing.weather_id,
-      music_id: music_id !== undefined ? music_id : existing.music_id,
-      oneshots: JSON.stringify(oneshots || []),
-      environment_volume: environmentVolume !== undefined ? environmentVolume : (existing.environment_volume ?? 70),
-      weather_volume: weatherVolume !== undefined ? weatherVolume : (existing.weather_volume ?? 45),
-      music_volume: musicVolume !== undefined ? musicVolume : (existing.music_volume ?? 60),
-    };
-
-    console.log('[Scene API] Updating scene:', { id, volumes: { env: sceneData.environment_volume, weather: sceneData.weather_volume, music: sceneData.music_volume } });
-    db.updateScene(id, sceneData);
-    res.json({ success: true, id });
-  } catch (err) {
-    console.error('Error updating scene:', err);
-    res.status(500).json({ error: 'Failed to update scene' });
-  }
-});
+}
+router.post('/', (req, res) => writeScene(req, res, false));
+router.put('/:id', (req, res) => writeScene(req, res, true));
 
 // Delete scene
 router.delete('/:id', (req, res) => {

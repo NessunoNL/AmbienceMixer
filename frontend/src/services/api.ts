@@ -1,6 +1,20 @@
-import type { Scene, MusicTag } from "../types";
+import type { Scene, SceneWrite, MusicTag } from "../types";
 
 const API_BASE = "/api";
+
+export interface SoundCategory {
+  id: number;
+  name: string;
+}
+
+export interface ScanResult {
+  success: boolean;
+  totalFiles: number;
+  deletedCount: number;
+  duration: number;
+  partial: boolean;
+  warnings: Array<{ category: string; file?: string; message: string }>;
+}
 
 export interface AudioLibrary {
   environment: AudioFile[];
@@ -17,6 +31,8 @@ export interface AudioFile {
   format: string;
   volume: number;
   tags?: MusicTag[];
+  soundCategoryId?: number | null;
+  soundCategory?: SoundCategory | null;
 }
 
 class ApiClient {
@@ -29,7 +45,7 @@ class ApiClient {
     return response.json();
   }
 
-  async triggerAudioScan(): Promise<{ success: boolean; totalFiles: number; duration: number }> {
+  async triggerAudioScan(): Promise<ScanResult> {
     const response = await fetch(`${API_BASE}/audio/scan`, {
       method: "POST",
     });
@@ -43,6 +59,37 @@ class ApiClient {
     return `${API_BASE}/audio/${id}/stream`;
   }
 
+  private async soundCategoryRequest<T>(path: string, method = "GET", body?: unknown): Promise<T> {
+    const response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Sound category request failed");
+    return result;
+  }
+
+  getSoundCategories(): Promise<SoundCategory[]> {
+    return this.soundCategoryRequest("/sound-categories");
+  }
+
+  createSoundCategory(name: string): Promise<{ success: boolean; category: SoundCategory }> {
+    return this.soundCategoryRequest("/sound-categories", "POST", { name });
+  }
+
+  renameSoundCategory(id: number, name: string): Promise<{ success: boolean; category: SoundCategory }> {
+    return this.soundCategoryRequest(`/sound-categories/${id}`, "PUT", { name });
+  }
+
+  deleteSoundCategory(id: number): Promise<{ success: boolean; id: number }> {
+    return this.soundCategoryRequest(`/sound-categories/${id}`, "DELETE");
+  }
+
+  assignSoundCategory(audioId: number, categoryId: number | null): Promise<{ success: boolean; audioId: number; categoryId: number | null }> {
+    return this.soundCategoryRequest(`/audio/${audioId}/sound-category`, "PUT", { categoryId });
+  }
+
   // Scene methods
   async getScenes(): Promise<Scene[]> {
     const response = await fetch(`${API_BASE}/scenes`);
@@ -52,7 +99,7 @@ class ApiClient {
     return response.json();
   }
 
-  async createScene(scene: Omit<Scene, "oneshots"> & { oneshots: number[] }): Promise<{ success: boolean; id: string }> {
+  async createScene(scene: SceneWrite): Promise<{ success: boolean; id: string }> {
     const response = await fetch(`${API_BASE}/scenes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -64,7 +111,7 @@ class ApiClient {
     return response.json();
   }
 
-  async updateScene(id: string, scene: Partial<Omit<Scene, "id" | "oneshots"> & { oneshots: number[] }>): Promise<{ success: boolean; id: string }> {
+  async updateScene(id: string, scene: Partial<Omit<SceneWrite, "id">>): Promise<{ success: boolean; id: string }> {
     const response = await fetch(`${API_BASE}/scenes/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

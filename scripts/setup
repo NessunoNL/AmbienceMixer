@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+root="$PWD"
+mkdir -p .local
+if [[ ! -x .local/node/bin/node ]]; then
+  archive=node-v22.23.4-linux-x64.tar.xz
+  [[ "$(uname -sm)" == 'Linux x86_64' ]] || { echo 'This bootstrap currently supports Linux x64.' >&2; exit 1; }
+  curl --fail --location --retry 3 "https://nodejs.org/dist/v22.23.4/$archive" -o ".local/$archive"
+  (cd .local; echo '1805bcd35e6815559bd2eb97db438d3fdb0eb3a5e6a977b7c1badca76337e9ce  node-v22.23.4-linux-x64.tar.xz' | sha256sum -c -)
+  mkdir -p .local/node
+  tar -xJf ".local/$archive" --strip-components=1 -C .local/node
+fi
+export PATH="$root/.local/node/bin:$PATH"
+for part in backend frontend; do
+  signature="$(sha256sum "$part/package-lock.json" | cut -d ' ' -f1)-$(node -v)"
+  if [[ ! -d "$part/node_modules" ]] || [[ "$(cat ".local/$part-deps" 2>/dev/null || true)" != "$signature" ]]; then
+    npm --prefix "$part" ci
+    echo "$signature" > ".local/$part-deps"
+  fi
+done
+mkdir -p .local/data .local/audio/{environment,weather,music,oneshots}

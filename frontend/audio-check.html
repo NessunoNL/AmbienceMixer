@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local audio checks</title>
+<style>body{font:18px system-ui;background:#272e2a;color:#e0e4d6;max-width:900px;margin:2rem auto;padding:1rem}button,select,input{font:inherit;margin:.4rem;padding:.7rem}label{display:block}fieldset{margin:1rem 0}pre{white-space:pre-wrap}button{cursor:pointer}</style></head><body>
+<h1>Local playback checks</h1><p>Development-only controls. Uses your local library; never saves scenes. Select two different ambiences when available. Set volume low before starting.</p>
+<label>Environment <select id="environment"></select></label>
+<label>Ambience A <select id="first"></select></label>
+<label>Ambience B <select id="second"></select></label>
+<label>One-shot <select id="shot"></select></label>
+<label>Ambience A volume <input id="volume" type="range" min="0" max="100" value="35"></label>
+<label><input id="enabled" type="checkbox" checked> Ambience A enabled on next Apply</label>
+<button id="apply">Start / Apply mix</button><button id="mute">Mute / unmute</button><button id="pause">Pause / resume A</button><button id="trigger">Trigger one-shot</button><button id="stop">Fade out scene</button><button id="dispose">Dispose audio</button>
+<fieldset><legend>Music queue</legend>
+<label>Mood <select id="mood"><option value="">All local music (test only)</option></select></label>
+<label>Music volume <input id="music-volume" type="range" min="0" max="100" value="35"></label>
+<button id="prepare-mood">Prepare mood</button><button id="apply-mood">Apply mood</button><button id="cancel-mood">Cancel prepared mood</button>
+<button id="next-song">Next song</button><button id="pause-music">Pause / resume music</button><button id="shuffle-music">Reshuffle upcoming</button><button id="near-end">Seek near end (test)</button>
+<pre id="music-state" role="status">No active mood</pre><div id="music-queue"></div>
+</fieldset>
+<pre id="status" role="status">Loading local library…</pre>
+<script type="module" src="/src/audioCheck.ts"></script></body></html>

@@ -3,6 +3,7 @@ import cors from 'cors';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import audioRouter from './routes/audio.js';
+import soundCategoriesRouter from './routes/soundCategories.js';
 import scenesRouter from './routes/scenes.js';
 import migrateRouter from './routes/migrate.js';
 import musicTagsRouter from './routes/musicTags.js';
@@ -27,6 +28,7 @@ app.use((req, res, next) => {
 
 // API routes
 app.use('/api/audio', audioRouter);
+app.use('/api/sound-categories', soundCategoriesRouter);
 app.use('/api/scenes', scenesRouter);
 app.use('/api/migrate', migrateRouter);
 app.use('/api/music', musicTagsRouter);
@@ -54,7 +56,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, async () => {
+app.listen(PORT, process.env.HOST || '0.0.0.0', async () => {
   console.log(`🚀 AmbientMixer backend running on port ${PORT}`);
   console.log(`   Environment: ${NODE_ENV}`);
 

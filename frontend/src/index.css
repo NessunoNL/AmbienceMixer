@@ -7,7 +7,7 @@
 }
 
 html {
-  background-color: #2B3339;
+  background-color: #242c28;
   /* Helps avoid white flashes behind overscroll on Android */
   overscroll-behavior: none;
 }
@@ -17,13 +17,13 @@ body {
   min-width: 320px;
   /* Use small viewport to include system UI insets */
   min-height: 100svh;
-  background-color: #2B3339;
+  background-color: #242c28;
   /* Ensure background fills around gesture/navigation areas */
   padding-bottom: env(safe-area-inset-bottom);
 }
 
 #root {
-  background-color: #2B3339;
+  background-color: #242c28;
 }
 
 /* Range slider styling */

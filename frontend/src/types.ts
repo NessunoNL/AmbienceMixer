@@ -17,6 +17,33 @@ export interface AudioLayer {
 
 export type MusicPlaybackMode = "single-loop" | "tag-shuffle";
 
+/** Scene mix levels use 0–100; AudioLayer.volume retains its 0–1 convention. */
+export interface SceneAmbienceInput {
+  audioId: number;
+  volume: number;
+  enabled?: boolean;
+}
+
+export interface SceneAmbience extends SceneAmbienceInput {
+  enabled: boolean;
+  audio: AudioLayer | null;
+}
+
+/** Write contract differs from hydrated Scene responses. */
+export interface SceneWrite {
+  id: string;
+  label: string;
+  icon: string;
+  environment_id?: number | null;
+  weather_id?: number | null;
+  music_id?: number | null;
+  environmentVolume?: number;
+  weatherVolume?: number;
+  musicVolume?: number;
+  oneshots?: number[];
+  ambiences?: SceneAmbienceInput[];
+}
+
 export interface Scene {
   id: string;
   label: string;
@@ -25,11 +52,13 @@ export interface Scene {
   weather?: AudioLayer;
   music?: AudioLayer;
   oneshots: OneShot[];
+  /** Optional while legacy UI constructors are still in use; API always returns it. */
+  ambiences?: SceneAmbience[];
   environmentVolume?: number;
   weatherVolume?: number;
   musicVolume?: number;
   musicMode?: MusicPlaybackMode;
-  musicTagId?: number;
+  musicTagId?: number | null;
 }
 
 export interface OneShot {

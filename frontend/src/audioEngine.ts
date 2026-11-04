@@ -1,403 +1,49 @@
-import type { LayerType } from "./types";
+import type { LayerType } from './types';
+import { StreamMixer } from './audio/streamMixer';
+import { ScenePlaybackController } from './audio/scenePlayback';
+import { MusicQueueController } from './audio/musicQueue';
+import { TRANSITIONS } from './audio/transitions';
 
-interface MusicPlaylist {
-  tracks: Array<{ url: string; name: string }>;
-  currentIndex: number;
-  shuffle: boolean;
-  volume: number;
-}
-
+/** Compatibility facade for the existing UI; all streams share one mixer. */
 export class AudioEngine {
-  private audioContext: AudioContext;
-  private layers: Map<LayerType, AudioLayerInstance> = new Map();
-  private fadingOutLayers: Set<AudioLayerInstance> = new Set();
-  private activeOneShots: Set<OneShotInstance> = new Set();
-  private masterGain: GainNode;
-  private musicPlaylist: MusicPlaylist | null = null;
-  private readonly MAX_ONESHOTS = 10;
+  readonly mixer: StreamMixer;
+  readonly scenes: ScenePlaybackController;
+  readonly music: MusicQueueController;
   private onTrackChangeCallback: (() => void) | null = null;
 
-  constructor() {
-    this.audioContext = new AudioContext();
-    this.masterGain = this.audioContext.createGain();
-    this.masterGain.connect(this.audioContext.destination);
+  constructor(context?: AudioContext) {
+    this.mixer = new StreamMixer(context);
+    this.scenes = new ScenePlaybackController(this.mixer);
+    this.music = new MusicQueueController(this.mixer);
+    this.music.subscribe(() => this.onTrackChangeCallback?.());
   }
+  setOnTrackChange(callback: (() => void) | null) { this.onTrackChangeCallback = callback; }
+  resume() { return this.mixer.resume(); }
+  setMuted(muted: boolean) { this.mixer.setMuted(muted); }
+  setPaused(type: LayerType, paused: boolean) { return type === 'music' ? this.music.setPaused(paused) : this.mixer.setPaused(type, paused); }
+  async dispose() { this.onTrackChangeCallback = null; this.music.dispose(); await this.mixer.dispose(); }
 
-  setOnTrackChange(callback: (() => void) | null): void {
-    this.onTrackChangeCallback = callback;
+  async loadLayer(type: LayerType, url: string, volume = 1, crossfadeDuration: number = TRANSITIONS.replacement) {
+    if (type === 'music') return this.music.playSingle(url, volume, crossfadeDuration);
+    return this.mixer.apply([{ key: type, url, volume, loop: true }], [type], crossfadeDuration);
   }
-
-  async loadLayer(type: LayerType, url: string, volume: number = 1, crossfadeDuration: number = 1.5): Promise<void> {
-    // Clear playlist if loading music layer (single track mode)
-    if (type === "music") {
-      this.musicPlaylist = null;
-    }
-
-    // Get existing layer and move to fading out state
-    const oldLayer = this.layers.get(type);
-    const currentTime = this.audioContext.currentTime;
-    const timeConstant = crossfadeDuration / 5;
-
-    // Remove old layer from active map immediately (before starting new one)
-    if (oldLayer) {
-      this.layers.delete(type);
-      this.fadingOutLayers.add(oldLayer);
-
-      // Fade out old layer
-      oldLayer.gainNode.gain.cancelScheduledValues(currentTime);
-      oldLayer.gainNode.gain.setValueAtTime(oldLayer.gainNode.gain.value, currentTime);
-      oldLayer.gainNode.gain.setTargetAtTime(0, currentTime, timeConstant);
-
-      // Schedule cleanup after crossfade completes
-      setTimeout(() => {
-        // Stop audio source
-        if (oldLayer.audioElement) {
-          oldLayer.audioElement.pause();
-          oldLayer.audioElement.currentTime = 0;
-        } else {
-          (oldLayer.source as AudioBufferSourceNode).stop();
-        }
-
-        // Disconnect audio nodes from graph
-        oldLayer.gainNode.disconnect();
-        oldLayer.source.disconnect();
-
-        // Remove from fading out tracking
-        this.fadingOutLayers.delete(oldLayer);
-      }, crossfadeDuration * 1000 * 5); // Wait for exponential fade to complete (~5 time constants)
-    }
-
-    try {
-      // Use streaming playback for looping layers (faster load times)
-      const audio = new Audio(url);
-      audio.loop = (type !== "music"); // Music doesn't loop in single track mode
-      audio.preload = "auto";
-
-      // Create media element source node for streaming
-      const source = this.audioContext.createMediaElementSource(audio);
-
-      const gainNode = this.audioContext.createGain();
-
-      // Set gain to 0 and schedule the crossfade immediately
-      gainNode.gain.setValueAtTime(0, currentTime);
-
-      source.connect(gainNode);
-      gainNode.connect(this.masterGain);
-
-      // Start playing (will stream from server)
-      await audio.play();
-
-      const newLayer = new AudioLayerInstance(source, gainNode, audio);
-
-      // Set new layer in map immediately so commands target the correct layer
-      this.layers.set(type, newLayer);
-
-      // Crossfade in with exponential curve (skip if muted)
-      if (volume > 0) {
-        // Get fresh current time after audio load (in case it took time)
-        const fadeStartTime = this.audioContext.currentTime;
-        // Use setTargetAtTime for smooth exponential fade
-        // Time constant = duration / 5 gives ~99% completion at duration
-        gainNode.gain.cancelScheduledValues(fadeStartTime);
-        gainNode.gain.setValueAtTime(0, fadeStartTime);
-        gainNode.gain.setTargetAtTime(volume, fadeStartTime, timeConstant);
-      }
-      // If volume is 0 (muted), keep it at 0 without crossfading
-    } catch (error) {
-      console.error(`Failed to load audio for ${type}:`, error);
-      throw error;
-    }
+  async crossfadeLayer(type: LayerType, targetVolume: number, duration = 1000) { this.setVolume(type, targetVolume, duration / 1000); }
+  setVolume(type: LayerType, volume: number, fadeDuration: number = TRANSITIONS.volume) {
+    if (type === 'music') this.music.setVolume(volume, fadeDuration);
+    else this.mixer.setVolume(type, volume, fadeDuration);
   }
-
-  async crossfadeLayer(type: LayerType, targetVolume: number, duration: number = 1000): Promise<void> {
-    const layer = this.layers.get(type);
-    if (!layer) return;
-
-    const currentTime = this.audioContext.currentTime;
-    const timeConstant = (duration / 1000) / 5; // Convert ms to seconds, divide by 5 for exponential curve
-
-    layer.gainNode.gain.cancelScheduledValues(currentTime);
-    layer.gainNode.gain.setValueAtTime(layer.gainNode.gain.value, currentTime);
-    layer.gainNode.gain.setTargetAtTime(targetVolume, currentTime, timeConstant);
+  async stopLayer(type: LayerType, fadeOut = true, fadeDuration: number = TRANSITIONS.replacement) {
+    if (type === 'music') return this.music.stop(fadeOut ? fadeDuration : 0);
+    await this.mixer.stop(type, fadeOut ? fadeDuration : 0);
   }
+  playOneShot(url: string, volume = 0.8) { return this.mixer.playOneShot(url, volume); }
 
-  setVolume(type: LayerType, volume: number, fadeDuration: number = 0.05): void {
-    const layer = this.layers.get(type);
-    if (!layer) return;
-
-    const currentTime = this.audioContext.currentTime;
-    const timeConstant = fadeDuration / 5; // Exponential curve
-
-    layer.gainNode.gain.cancelScheduledValues(currentTime);
-    layer.gainNode.gain.setValueAtTime(layer.gainNode.gain.value, currentTime);
-    layer.gainNode.gain.setTargetAtTime(volume, currentTime, timeConstant);
+  async loadMusicPlaylist(tracks: Array<{ url: string; name: string }>, volume = 1, shuffle = true, duration: number = TRANSITIONS.replacement) {
+    return this.music.applyMood({ id: 'legacy-playlist', name: 'Playlist', tracks: tracks.map(track => ({ ...track, id: track.url })) }, duration, shuffle, volume);
   }
-
-  async stopLayer(type: LayerType, fadeOut: boolean = true, fadeDuration: number = 0.5): Promise<void> {
-    const layer = this.layers.get(type);
-    if (!layer) return;
-
-    // Remove from active layers map immediately
-    this.layers.delete(type);
-
-    if (fadeOut) {
-      // Add to fading out tracking
-      this.fadingOutLayers.add(layer);
-
-      const durationMs = fadeDuration * 1000;
-      const currentTime = this.audioContext.currentTime;
-      const timeConstant = (fadeDuration) / 5;
-
-      // Fade out
-      layer.gainNode.gain.cancelScheduledValues(currentTime);
-      layer.gainNode.gain.setValueAtTime(layer.gainNode.gain.value, currentTime);
-      layer.gainNode.gain.setTargetAtTime(0, currentTime, timeConstant);
-
-      setTimeout(() => {
-        // Stop audio source
-        if (layer.audioElement) {
-          layer.audioElement.pause();
-          layer.audioElement.currentTime = 0;
-        } else {
-          (layer.source as AudioBufferSourceNode).stop();
-        }
-
-        // Disconnect audio nodes from graph
-        layer.gainNode.disconnect();
-        layer.source.disconnect();
-
-        // Remove from fading out tracking
-        this.fadingOutLayers.delete(layer);
-      }, durationMs * 5); // Wait for exponential fade to complete (~5 time constants)
-    } else {
-      // Stop immediately without fade
-      if (layer.audioElement) {
-        layer.audioElement.pause();
-        layer.audioElement.currentTime = 0;
-      } else {
-        (layer.source as AudioBufferSourceNode).stop();
-      }
-
-      // Disconnect audio nodes from graph
-      layer.gainNode.disconnect();
-      layer.source.disconnect();
-    }
-  }
-
-  async playOneShot(url: string, volume: number = 0.8): Promise<void> {
-    try {
-      // Enforce max concurrent one-shots limit
-      if (this.activeOneShots.size >= this.MAX_ONESHOTS) {
-        // Remove oldest one-shot
-        const oldest = this.activeOneShots.values().next().value;
-        if (oldest) {
-          this.cleanupOneShot(oldest);
-        }
-      }
-
-      // Use streaming playback (no download/decode delay)
-      const audio = new Audio(url);
-      audio.preload = "auto";
-
-      const source = this.audioContext.createMediaElementSource(audio);
-      const gainNode = this.audioContext.createGain();
-      gainNode.gain.value = volume;
-
-      source.connect(gainNode);
-      gainNode.connect(this.masterGain);
-
-      const instance = new OneShotInstance(source, gainNode, audio);
-      this.activeOneShots.add(instance);
-
-      // Auto-cleanup when playback completes
-      audio.addEventListener("ended", () => {
-        this.cleanupOneShot(instance);
-      });
-
-      await audio.play();
-    } catch (error) {
-      console.error("Failed to play one-shot:", error);
-    }
-  }
-
-  private cleanupOneShot(instance: OneShotInstance): void {
-    if (instance.audio) {
-      instance.audio.pause();
-      instance.audio.currentTime = 0;
-    }
-    instance.gainNode.disconnect();
-    instance.source.disconnect();
-    this.activeOneShots.delete(instance);
-  }
-
-  async loadMusicPlaylist(tracks: Array<{ url: string; name: string }>, volume: number = 1, shuffle: boolean = true): Promise<void> {
-    if (tracks.length === 0) {
-      throw new Error("Cannot load empty playlist");
-    }
-
-    // Initialize playlist
-    const playOrder = shuffle ? this.shuffleArray([...tracks]) : tracks;
-    this.musicPlaylist = {
-      tracks: playOrder,
-      currentIndex: 0,
-      shuffle,
-      volume,
-    };
-
-    // Load first track
-    await this.loadPlaylistTrack(0, volume);
-  }
-
-  private async loadPlaylistTrack(index: number, volume: number, crossfadeDuration: number = 1.5): Promise<void> {
-    if (!this.musicPlaylist || index >= this.musicPlaylist.tracks.length) {
-      return;
-    }
-
-    const url = this.musicPlaylist.tracks[index].url;
-    this.musicPlaylist.currentIndex = index;
-
-    // Get existing music layer
-    const oldLayer = this.layers.get("music");
-    const currentTime = this.audioContext.currentTime;
-    const timeConstant = crossfadeDuration / 5;
-
-    // Fade out old layer if exists
-    if (oldLayer) {
-      this.layers.delete("music");
-      this.fadingOutLayers.add(oldLayer);
-
-      oldLayer.gainNode.gain.cancelScheduledValues(currentTime);
-      oldLayer.gainNode.gain.setValueAtTime(oldLayer.gainNode.gain.value, currentTime);
-      oldLayer.gainNode.gain.setTargetAtTime(0, currentTime, timeConstant);
-
-      setTimeout(() => {
-        if (oldLayer.audioElement) {
-          oldLayer.audioElement.pause();
-          oldLayer.audioElement.currentTime = 0;
-          oldLayer.audioElement.removeEventListener("ended", oldLayer.onEnded!);
-        }
-        oldLayer.gainNode.disconnect();
-        oldLayer.source.disconnect();
-        this.fadingOutLayers.delete(oldLayer);
-      }, crossfadeDuration * 1000 * 5);
-    }
-
-    try {
-      const audio = new Audio(url);
-      audio.loop = false; // Playlist mode - don't loop individual tracks
-      audio.preload = "auto";
-
-      // Set up track-end handler to play next track
-      const onEnded = () => {
-        console.log("[Playlist] Track ended, playing next");
-        this.playNextTrack();
-      };
-      audio.addEventListener("ended", onEnded);
-
-      const source = this.audioContext.createMediaElementSource(audio);
-      const gainNode = this.audioContext.createGain();
-
-      gainNode.gain.setValueAtTime(0, currentTime);
-
-      source.connect(gainNode);
-      gainNode.connect(this.masterGain);
-
-      await audio.play();
-
-      const newLayer = new AudioLayerInstance(source, gainNode, audio, onEnded);
-      this.layers.set("music", newLayer);
-
-      // Fade in
-      if (volume > 0) {
-        const fadeStartTime = this.audioContext.currentTime;
-        gainNode.gain.cancelScheduledValues(fadeStartTime);
-        gainNode.gain.setValueAtTime(0, fadeStartTime);
-        gainNode.gain.setTargetAtTime(volume, fadeStartTime, timeConstant);
-      }
-
-      // Notify that track has changed
-      if (this.onTrackChangeCallback) {
-        this.onTrackChangeCallback();
-      }
-    } catch (error) {
-      console.error("Failed to load playlist track:", error);
-      // Try next track on error
-      this.playNextTrack();
-    }
-  }
-
-  async playNextTrack(): Promise<void> {
-    if (!this.musicPlaylist) return;
-
-    const nextIndex = (this.musicPlaylist.currentIndex + 1) % this.musicPlaylist.tracks.length;
-
-    // If we've completed the playlist and shuffle is on, reshuffle
-    if (nextIndex === 0 && this.musicPlaylist.shuffle) {
-      this.musicPlaylist.tracks = this.shuffleArray([...this.musicPlaylist.tracks]);
-    }
-
-    await this.loadPlaylistTrack(nextIndex, this.musicPlaylist.volume, 2.0);
-  }
-
+  playNextTrack() { return this.music.next(); }
   getCurrentTrackInfo(): { name: string; index: number; total: number } | null {
-    if (!this.musicPlaylist) return null;
-
-    const track = this.musicPlaylist.tracks[this.musicPlaylist.currentIndex];
-
-    return {
-      name: track.name,
-      index: this.musicPlaylist.currentIndex,
-      total: this.musicPlaylist.tracks.length,
-    };
-  }
-
-  private shuffleArray<T>(array: T[]): T[] {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  }
-
-  resume(): void {
-    if (this.audioContext.state === "suspended") {
-      this.audioContext.resume();
-    }
-  }
-}
-
-class AudioLayerInstance {
-  source: AudioBufferSourceNode | MediaElementAudioSourceNode;
-  gainNode: GainNode;
-  audioElement?: HTMLAudioElement; // For streaming playback
-  onEnded?: () => void; // Track-end callback for playlist mode
-
-  constructor(
-    source: AudioBufferSourceNode | MediaElementAudioSourceNode,
-    gainNode: GainNode,
-    audioElement?: HTMLAudioElement,
-    onEnded?: () => void
-  ) {
-    this.source = source;
-    this.gainNode = gainNode;
-    this.audioElement = audioElement;
-    this.onEnded = onEnded;
-  }
-}
-
-class OneShotInstance {
-  source: MediaElementAudioSourceNode;
-  gainNode: GainNode;
-  audio: HTMLAudioElement;
-
-  constructor(
-    source: MediaElementAudioSourceNode,
-    gainNode: GainNode,
-    audio: HTMLAudioElement
-  ) {
-    this.source = source;
-    this.gainNode = gainNode;
-    this.audio = audio;
+    const state = this.music.getSnapshot();
+    return state.current ? { name: state.current.name, index: (state.playedCount - 1) % state.total, total: state.total } : null;
   }
 }

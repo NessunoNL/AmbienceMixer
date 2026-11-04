@@ -12,6 +12,7 @@ class DatabaseService {
   constructor() {
     this.db = new Database(DB_PATH, { verbose: console.log });
     this.db.pragma('journal_mode = WAL');
+    this.db.pragma('foreign_keys = ON');
     this.initialize();
   }
 
@@ -20,12 +21,26 @@ class DatabaseService {
     this.db.exec(schema);
 
     // Run migrations
-    this.runMigrations();
+    this.db.transaction(() => this.runMigrations())();
 
     console.log('✓ Database initialized');
   }
 
   runMigrations() {
+    this.db.exec(`CREATE TABLE IF NOT EXISTS sound_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL COLLATE NOCASE UNIQUE CHECK(length(trim(name)) > 0)
+    )`);
+    if (!this.db.pragma('table_info(audio_files)').some(col => col.name === 'sound_category_id')) {
+      this.db.exec('ALTER TABLE audio_files ADD COLUMN sound_category_id INTEGER REFERENCES sound_categories(id) ON DELETE SET NULL');
+    }
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_audio_sound_category ON audio_files(sound_category_id)');
+
+    // Older installations may predate the manual volume-column migration.
+    const columns = this.db.pragma('table_info(scenes)').map(col => col.name);
+    for (const [name, fallback] of Object.entries({ environment_volume: 70, weather_volume: 45, music_volume: 60 })) {
+      if (!columns.includes(name)) this.db.exec(`ALTER TABLE scenes ADD COLUMN ${name} INTEGER DEFAULT ${fallback}`);
+    }
     // Check if music_mode column exists
     const scenesInfo = this.db.pragma('table_info(scenes)');
     const hasMusicMode = scenesInfo.some(col => col.name === 'music_mode');
@@ -40,6 +55,28 @@ class DatabaseService {
     if (!hasMusicTagId) {
       console.log('  ✓ Adding music_tag_id column to scenes');
       this.db.exec(`ALTER TABLE scenes ADD COLUMN music_tag_id INTEGER REFERENCES music_tags(id) ON DELETE SET NULL`);
+    }
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY);
+      CREATE TABLE IF NOT EXISTS scene_ambiences (
+        scene_id TEXT NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+        audio_id INTEGER NOT NULL REFERENCES audio_files(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL CHECK(position >= 0),
+        volume REAL NOT NULL CHECK(volume >= 0 AND volume <= 100),
+        enabled INTEGER NOT NULL DEFAULT 1 CHECK(enabled IN (0, 1)),
+        PRIMARY KEY (scene_id, audio_id),
+        UNIQUE (scene_id, position)
+      );
+    `);
+    if (!this.db.prepare('SELECT 1 FROM schema_migrations WHERE name = ?').get('scene-ambiences-v1')) {
+      this.db.exec(`
+        INSERT INTO scene_ambiences (scene_id, audio_id, position, volume, enabled)
+        SELECT s.id, s.weather_id, 0, COALESCE(s.weather_volume, 45), 1
+        FROM scenes s JOIN audio_files a ON a.id = s.weather_id
+        WHERE a.category = 'weather';
+      `);
+      this.db.prepare('INSERT INTO schema_migrations (name) VALUES (?)').run('scene-ambiences-v1');
     }
   }
 
@@ -83,6 +120,33 @@ class DatabaseService {
     return stmt.run(path);
   }
 
+  // User-facing sound categories are independent of the physical audio folders.
+  getSoundCategories() {
+    return this.db.prepare('SELECT id, name FROM sound_categories ORDER BY name COLLATE NOCASE').all();
+  }
+
+  getSoundCategory(id) {
+    return this.db.prepare('SELECT id, name FROM sound_categories WHERE id = ?').get(id);
+  }
+
+  createSoundCategory(name) {
+    const result = this.db.prepare('INSERT INTO sound_categories (name) VALUES (?)').run(name);
+    return this.getSoundCategory(result.lastInsertRowid);
+  }
+
+  renameSoundCategory(id, name) {
+    this.db.prepare('UPDATE sound_categories SET name = ? WHERE id = ?').run(name, id);
+    return this.getSoundCategory(id);
+  }
+
+  deleteSoundCategory(id) {
+    return this.db.prepare('DELETE FROM sound_categories WHERE id = ?').run(id);
+  }
+
+  assignSoundCategory(audioId, categoryId) {
+    return this.db.prepare("UPDATE audio_files SET sound_category_id = ? WHERE id = ? AND category IN ('weather', 'oneshots')").run(categoryId, audioId);
+  }
+
   // Scenes methods
   getAllScenes() {
     const stmt = this.db.prepare('SELECT * FROM scenes ORDER BY created_at DESC');
@@ -118,6 +182,21 @@ class DatabaseService {
       WHERE id = @id
     `);
     return stmt.run({ ...scene, id });
+  }
+
+  getSceneAmbiences(id) {
+    return this.db.prepare('SELECT audio_id AS audioId, volume, enabled FROM scene_ambiences WHERE scene_id = ? ORDER BY position')
+      .all(id).map(row => ({ ...row, enabled: Boolean(row.enabled) }));
+  }
+
+  saveScene(scene, ambiences, updating = false) {
+    return this.db.transaction(() => {
+      const result = updating ? this.updateScene(scene.id, scene) : this.insertScene(scene);
+      this.db.prepare('DELETE FROM scene_ambiences WHERE scene_id = ?').run(scene.id);
+      const insert = this.db.prepare('INSERT INTO scene_ambiences (scene_id, audio_id, position, volume, enabled) VALUES (?, ?, ?, ?, ?)');
+      ambiences.forEach((entry, position) => insert.run(scene.id, entry.audioId, position, entry.volume, Number(entry.enabled)));
+      return result;
+    })();
   }
 
   deleteScene(id) {

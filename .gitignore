@@ -36,3 +36,12 @@ coverage/
 # Temp files
 *.tmp
 .cache/
+
+# Local audio, runtime, databases and generated frontend
+.local/
+data/
+backend/public/
+!.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/extensions.json

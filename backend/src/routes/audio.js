@@ -3,6 +3,7 @@ import { createReadStream, statSync } from 'fs';
 import { join } from 'path';
 import db from '../services/database.js';
 import audioScanner from '../services/audioScanner.js';
+import { assignSoundCategory } from './soundCategories.js';
 
 const router = express.Router();
 const AUDIO_DIR = process.env.AUDIO_DIR || '/app/audio';
@@ -17,6 +18,8 @@ router.get('/library', (req, res) => {
     res.status(500).json({ error: 'Failed to fetch library' });
   }
 });
+
+router.put('/:id/sound-category', assignSoundCategory);
 
 // Get single audio file metadata
 router.get('/:id', (req, res) => {

@@ -8,28 +8,21 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'vite.svg'],
+      includeAssets: ['icon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'Ambience Mixer',
         short_name: 'Ambience',
         description: 'Mobile-first web app for Dungeon Masters to control music and ambient sounds during tabletop RPG sessions',
-        theme_color: '#2B3339',
-        background_color: '#2B3339',
+        theme_color: '#242c28',
+        background_color: '#242c28',
         display: 'standalone',
+        start_url: '/',
+        scope: '/',
         orientation: 'any',
         icons: [
-          {
-            src: '/icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any'
-          },
-          {
-            src: '/vite.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'maskable'
-          }
+          { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' }
         ]
       },
       workbox: {
@@ -60,7 +53,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.API_PROXY_TARGET || 'http://localhost:3000',
         changeOrigin: true,
       },
     },

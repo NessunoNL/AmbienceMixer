@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+./scripts/setup
+export PATH="$PWD/.local/node/bin:$PATH"
+npm --prefix frontend run build
+find backend/src -name '*.js' -exec node --check {} ";"

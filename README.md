@@ -1,13 +1,15 @@
 # AmbientMixer
 
-A mobile-first web application for Dungeon Masters to control music and ambient sounds during tabletop RPG sessions. Features a 3-layer audio mixer (Environment, Weather, Music) with smooth crossfades, scene presets, and context-aware one-shot sound effects.
+A mobile-first web application for Dungeon Masters to control music and ambient sounds during tabletop RPG sessions. Features scenes with an environment, multiple ambiences and one-shots, plus independent mood-based music with smooth transitions.
+
+For the current local VSCodium workflow, see [DEVELOPMENT.md](DEVELOPMENT.md). Agent instructions are in [AGENTS.md](AGENTS.md).
 
 ## Features
 
-- **3-Layer Mixer**: Independent control of Environment, Weather, and Music layers
+- **Scene-and-Mood Mixer**: Prepare scenes and music moods, then Apply; adjust active sound levels immediately
 - **Scene Management**: Create, edit, and delete custom scene presets
-- **One-Shot Effects**: Trigger context-aware sound effects with automatic music ducking
-- **Smooth Crossfades**: All audio transitions fade smoothly (1000ms for scenes, 300ms for mute)
+- **One-Shot Effects**: Trigger context-aware sound effects
+- **Smooth Crossfades**: Adjustable scene and music transitions, including next-song changes
 - **Persistent Storage**: Scenes and preferences saved to SQLite database
 - **Audio Streaming**: HTTP range request support for seeking in audio files
 - **Mobile-First**: Optimized for tablets and phones with Everforest-inspired theme

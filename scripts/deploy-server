@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd /opt/docker/AmbienceMixer
+[[ "$(git branch --show-current)" == master ]] || { echo 'Server must be on master.' >&2; exit 1; }
+[[ -z "$(git status --porcelain --untracked-files=no)" ]] || { echo 'Server has tracked changes; stopping.' >&2; exit 1; }
+git fetch origin master
+[[ "$(git rev-parse origin/master)" == "$1" ]] || { echo 'Remote commit changed; stopping.' >&2; exit 1; }
+previous_commit="$(git rev-parse HEAD)"
+previous_image="$(docker inspect --format '{{.Image}}' ambience-mixer)"
+stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+rollback_image="ambience-mixer:rollback-$stamp"
+docker tag "$previous_image" "$rollback_image"
+mkdir -p .local/deploy
+printf 'services:
+  ambience-mixer:
+    image: %s
+' "$rollback_image" > ".local/deploy/rollback-$stamp.yml"
+# SQLite online backup is consistent even while the application is running.
+docker exec -w /app ambience-mixer node --input-type=module -e 'import Database from "better-sqlite3"; const db = new Database(process.env.DB_PATH); await db.backup(process.env.DB_PATH + ".backup-" + process.argv[1]); db.close();' "$stamp"
+printf 'Previous commit: %s
+Previous image: %s
+' "$previous_commit" "$rollback_image"
+echo "Rollback command: docker compose -f docker-compose.yml -f .local/deploy/rollback-$stamp.yml up -d --no-build"
+echo 'The database backup is in data/. Restoring data after a schema change requires a separate decision.'
+git pull --ff-only origin master
+[[ "$(git rev-parse HEAD)" == "$1" ]] || { echo 'Unexpected checkout; stopping.' >&2; exit 1; }
+docker compose build
+docker compose up -d --no-build
+for attempt in {1..30}; do
+  if docker exec ambience-mixer node -e 'fetch("http://127.0.0.1:3000/api/health").then(r => { if (!r.ok) process.exit(1); }).catch(() => process.exit(1))' >/dev/null 2>&1; then
+    echo "Deployed $1. API health passed. Check playback in the live browser."
+    exit 0
+  fi
+  sleep 2
+done
+echo 'Health check failed. Use the rollback command printed above.' >&2
+exit 1
