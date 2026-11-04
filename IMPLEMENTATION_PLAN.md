@@ -196,3 +196,7 @@ Leave publication to a separate user request using the existing backup/deploymen
 The form-heavy stage-5 UI and the later selection-tile performance redesign were rejected. `PerformanceMixer.tsx` now ports the approved `design/scene-and-mood.html` composition: scene chips, compact environment, two-column ambience fills, mood buttons, now-playing/queue and bottom one-shots. `performance.css` starts from the original mockup CSS. Forms remain in dialogs; added Apply controls preserve prepared versus active playback. Sound picker category chips replace the dropdown. Do not redesign these surfaces again without a user request.
 
 The home fits 1280×720 and 800×1280 desktop-emulated tablet viewports without page overflow. Long collections open bounded dialogs. Actual Samsung touch, listening and long-session checks remain pending.
+
+### Latest tablet feedback follow-up
+
+Replaced visible environment/music sliders with fill controls, removed repetitive home text, added direct prepared-scene one-shot selection, responsive active shot cards, and a full internally scrolling music queue with compact now-playing. One-shots now use bounded decoded Web Audio playback/cache through master mute. See VERIFICATION.md for checks and the still-unverified physical tablet timeout/layout. Missing sounds are not present in the mounted 63-file share; awaiting an example/location. Background volume balance is a separate decision; existing levels remain preserved.

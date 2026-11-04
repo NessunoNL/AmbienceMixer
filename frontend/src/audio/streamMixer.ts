@@ -1,3 +1,4 @@
+import { OneShotPlayer } from './oneShots';
 import { GainEnvelope, level, seconds, TRANSITIONS } from './transitions';
 
 export interface StreamSpec { key: string; url: string; volume: number; loop: boolean; restart?: boolean; }
@@ -52,8 +53,7 @@ export class StreamMixer {
   private loopTimer?: ReturnType<typeof setInterval>;
   private disposed = false;
   private unlocked = false;
-  private shotIndex = 0;
-  private shots: string[] = [];
+  private oneShots: OneShotPlayer;
   onError: (error: unknown) => void = error => console.error('Audio playback failed:', error);
 
   constructor(context = new AudioContext()) {
@@ -61,6 +61,7 @@ export class StreamMixer {
     this.master = context.createGain();
     this.masterGain = new GainEnvelope(context, this.master.gain, 1);
     this.master.connect(context.destination);
+    this.oneShots = new OneShotPlayer(context, this.master);
   }
 
   /** Call from a user gesture. Constructing/restoring state never starts audio. */
@@ -386,24 +387,15 @@ export class StreamMixer {
   }
 
   async playOneShot(url: string, volume: number) {
-    const key = `oneshot:${++this.shotIndex}`;
-    this.shots = this.shots.filter(id => this.channels.get(id)?.current || this.pending.has(id));
-    while (this.shots.length >= 10) {
-      const oldest = this.shots.shift()!;
-      void this.stop(oldest, 0.01);
-    }
-    this.shots.push(key);
-    try {
-      if (await this.apply([{ key, url, volume, loop: false }], [key], 0.005)) {
-        this.setEnded(key, () => { const channel = this.channels.get(key)!; if (channel.current) this.cleanup(channel.current, channel); });
-      }
-    } catch (error) { this.shots = this.shots.filter(id => id !== key); throw error; }
+    if (!this.unlocked || this.disposed) throw new Error('Start audio with a user gesture first');
+    await this.oneShots.play(url, volume);
   }
 
   async dispose() {
     if (this.disposed) return;
     this.disposed = true;
     clearInterval(this.loopTimer);
+    this.oneShots.dispose();
     for (const controller of this.pending.values()) controller.abort();
     this.pending.clear();
     for (const key of this.preloads.keys()) this.cancelPreload(key);

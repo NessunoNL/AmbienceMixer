@@ -131,6 +131,10 @@ Browser automation was unavailable on resumption; the earlier native rename-prom
 
 ## Approved mockup interface (2026-11-04)
 
-The home screen ports the original scene-and-mood mockup rather than presenting the scene editor as the mixer. Scene chips run above the environment/ambience and mood/queue panels. Editing, Library and transition settings open contained dialogs. Home shows up to four ambiences, five one-shots and three upcoming tracks; All sounds, All one-shots and Full queue expose larger collections. Scene and mood preparation is silent until Apply; Save only persists. The active scene owns the one-shot triggers. Category filters in sound pickers use buttons and remain independent of search.
+The home screen ports the original scene-and-mood mockup rather than presenting the scene editor as the mixer. Scene chips run above the environment/ambience and mood/queue panels. Editing, Library and transition settings open contained dialogs. Home shows up to four ambiences with All sounds for the rest. The full upcoming music queue scrolls inside its panel. All active one-shots appear in a responsive grid, with contained scrolling for large selections. Choose one-shots edits the prepared scene directly; Save persists it and Apply updates the active strip. Environment and music use the same drag/keyboard background-fill volume controls as ambiences. Scene and mood preparation is silent until Apply; Save only persists. The active scene owns the one-shot triggers. Category filters in sound pickers use buttons and remain independent of search.
 
 The user authorized testing on the existing homelab with its full NAS library. Follow `scripts/deploy` and keep database/image backups. A clean temporary checkout may be used to deploy a pushed commit while preserving unrelated local changes.
+
+### One-shot playback
+
+One-shots use fetched, decoded Web Audio buffers instead of streaming media elements. Successful decodes are cached (at most eight clips / 32 MiB decoded memory); downloads larger than 32 MiB are rejected. Playback starts from sample zero through the existing master bus. Up to ten effects overlap; older effects fade out when that limit is reached. Failures are reported and retried only on another explicit trigger. Background gain levels remain unchanged pending a decision about a shared background trim control.

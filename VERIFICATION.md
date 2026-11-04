@@ -1,3 +1,13 @@
+## Tablet-feedback follow-up
+
+Implemented: remove explanatory home copy; direct prepared-scene one-shot selection; responsive active one-shot grid; full queue scrolling inside its card; compact current song; fill-only environment/music volumes. Save/Apply and active-scene one-shot separation are preserved.
+
+`./scripts/check` passes. Targeted tests: 25 playback tests and two home-render tests pass, including master mute, bounded one-shot overlap, decoded-buffer reuse, HTTP failure/retry, disposal during loading, full queue/shot rendering and active/prepared scene separation.
+
+Live `/api/audio/1333/stream` returns a complete 661132-byte PCM WAV (24 kHz, stereo, 6.886 seconds). The old media-element timeout could not be reproduced because browser automation is unavailable in this session (no browser surfaces). The new decoded-buffer playback path needs an actual tablet retry. New layout, pointer gestures and audible output have not yet been browser/device verified.
+
+The mounted NAS still has 63 files, all indexed; a missing filename or expected folder/share is needed to investigate additional audio. Do not claim missing audio has been recovered. Saved scene volume levels were not changed.
+
 # Latest UI verification — 2026-11-04
 
 The original mockup composition has replaced the two rejected home layouts. Production testing is now explicitly authorized by the user.

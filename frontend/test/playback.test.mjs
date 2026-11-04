@@ -13,6 +13,7 @@ after(() => rmSync(directory, { recursive: true, force: true }));
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 class Param {
   value = 1; events = [];
+  setTargetAtTime(value) { this.value = value; }
   cancelScheduledValues(time) { this.events.push(['cancel', time]); }
   setValueAtTime(value, time) { this.events.push(['set', value, time]); this.value = value; }
   setValueCurveAtTime(values, time, duration) { this.events.push(['curve', values, time, duration]); }
@@ -26,6 +27,8 @@ class Context {
   currentTime = 0; state = 'suspended'; destination = {}; nodes = []; sources = [];
   createGain() { const node = new Node(); this.nodes.push(node); return node; }
   createMediaElementSource(audio) { const node = new Node(); node.audio = audio; this.sources.push(node); return node; }
+  async decodeAudioData() { return { length: 48000, numberOfChannels: 2 }; }
+  createBufferSource() { const node = new Node(); node.start = () => {}; node.stop = () => node.onended?.(); this.sources.push(node); return node; }
   async resume() { this.state = 'running'; }
   async close() { this.state = 'closed'; }
 }
@@ -46,6 +49,7 @@ class Audio extends EventTarget {
   removeAttribute() { this.src = ''; }
 }
 globalThis.Audio = Audio;
+globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(16) });
 const body = { children: new Set(), append(audio) { this.children.add(audio); audio.parentNode = this; },
   removeChild(audio) { this.children.delete(audio); audio.parentNode = undefined; } };
 globalThis.document = { body };
@@ -241,9 +245,9 @@ test('one-shot concurrency is bounded and ended streams release their channels',
   const { engine, mixer, context } = await engineFixture(t);
   await Promise.all(Array.from({ length: 12 }, (_, i) => engine.playOneShot(`shot-${i}`)));
   await wait(20);
-  assert.equal(mixer.getKeys().filter(key => key.startsWith('oneshot:')).length, 10);
-  for (const key of mixer.getKeys()) mixer.getAudio(key)?.dispatchEvent(new Event('ended'));
-  assert.equal(mixer.getKeys().length, 0);
+  assert.equal(mixer.oneShots.active.size, 10);
+  for (const source of context.sources) source.onended?.();
+  assert.equal(mixer.oneShots.active.size, 0);
   assert.ok(context.sources.every(source => source.disconnected));
 });
 
@@ -425,4 +429,32 @@ test('media stays attached during playback and disposal removes every element', 
   assert.equal(body.children.size, 2);
   await engine.dispose();
   assert.equal(body.children.size, 0);
+});
+
+test('one-shots share decoded buffers, retain their attack and retry failed downloads only on demand', async t => {
+  const { engine, context } = await engineFixture(t);
+  const previousFetch = globalThis.fetch; let fetches = 0, decodes = 0;
+  t.after(() => { globalThis.fetch = previousFetch; });
+  globalThis.fetch = async () => { fetches++; return { ok: false, status: 404 }; };
+  await assert.rejects(engine.playOneShot('missing'), /HTTP 404/);
+  assert.equal(fetches, 1);
+  globalThis.fetch = async () => { fetches++; return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
+  context.decodeAudioData = async () => { decodes++; return { length: 48000, numberOfChannels: 2 }; };
+  await Promise.all([engine.playOneShot('effect', .3), engine.playOneShot('effect', .4)]);
+  await engine.playOneShot('effect', .5);
+  assert.equal(fetches, 2); assert.equal(decodes, 1);
+  assert.equal(context.sources.at(-1).destination.gain.value, .5);
+});
+
+test('disposing during one-shot loading cannot start late audio', async t => {
+  const { engine, context } = await engineFixture(t);
+  const previousFetch = globalThis.fetch; let release;
+  t.after(() => { globalThis.fetch = previousFetch; });
+  globalThis.fetch = () => new Promise(resolve => { release = resolve; });
+  const pending = engine.playOneShot('slow');
+  const rejected = assert.rejects(pending, /disposed/);
+  await engine.dispose();
+  release({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+  await rejected;
+  assert.equal(context.sources.length, 0);
 });

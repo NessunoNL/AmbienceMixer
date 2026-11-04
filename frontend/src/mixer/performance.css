@@ -66,4 +66,32 @@ body:has(.mockup-app){padding:0;overflow:hidden}
 #scene-mood .sheet-filters{max-height:100px;overflow:auto}
 @media(max-width:650px){#scene-mood .picker-results{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* Short landscape screens expose the rest of the queue through Full queue. */
-@media(max-height:760px) and (min-width:801px){#scene-mood .songs>.song:nth-child(n+2){display:none}}
+@media(max-height:760px) and (min-width:801px){#scene-mood .songs>.song{display:flex}}
+
+/* Playback controls stay compact; only the queue and long shot collections scroll. */
+#scene-mood .environment-volume{flex-shrink:0;margin:2px 0 4px}
+#scene-mood .environment-volume .volume-gesture{min-height:64px}
+#scene-mood .music-volume{display:flex;gap:8px;align-items:stretch}
+#scene-mood .music-volume>.volume-card{flex:1}
+#scene-mood .music-volume .volume-gesture{min-height:46px}
+#scene-mood .now{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:10px 12px;flex-shrink:0}
+#scene-mood .now>.row:first-child{grid-column:1/-1}
+#scene-mood .now-title{font-size:15px;margin:0;align-self:center;min-width:0}
+#scene-mood .now>.row:last-child{flex-wrap:nowrap;gap:4px}
+#scene-mood .now>.row:last-child>.muted:empty{display:none}
+#scene-mood .songs{overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;min-height:44px}
+#scene-mood .songs>.song{display:flex;min-height:44px;padding:8px 4px}
+#scene-mood .shots{display:flex;flex-direction:column;overflow:hidden}
+#scene-mood .shots>.row{flex-shrink:0}
+#scene-mood .shot-grid{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;grid-auto-rows:minmax(48px,1fr);gap:8px}
+#scene-mood .shot-grid button{min-height:48px;padding:7px;justify-content:center}
+#scene-mood .shot-grid>.muted{grid-column:1/-1}
+#scene-mood .foot{min-height:0}
+#scene-mood .overlay-body>.scene-panel{overflow:visible;display:block;max-height:none}
+#scene-mood .overlay-body .ambience-grid .volume-card{min-height:70px}
+@media(max-width:600px){#scene-mood .shot-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+
+#scene-mood{--shot-height:110px;grid-template-rows:44px 48px minmax(0,1fr) var(--shot-height) 44px}
+#scene-mood[data-shot-rows="2"]{--shot-height:164px}
+#scene-mood[data-pending="false"]{grid-template-rows:44px 48px minmax(0,1fr) var(--shot-height)}
+#scene-mood[data-pending="false"]>.foot{display:none}
