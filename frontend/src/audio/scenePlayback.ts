@@ -3,6 +3,9 @@ import { StreamMixer } from './streamMixer';
 import type { StreamSpec } from './streamMixer';
 import { TRANSITIONS } from './transitions';
 
+// Persist control positions on the existing 0–100 scale; full background gain is 20%.
+const backgroundGain = (position: number) => Math.max(0, Math.min(100, position)) / 500;
+const backgroundPosition = (gain: number) => Math.round(gain * 500 * 1e6) / 1e6;
 const ambienceKey = (id: number) => `ambience:${id}`;
 const sceneKey = (key: string) => key === 'environment' || key === 'weather' || key.startsWith('ambience:');
 
@@ -19,19 +22,19 @@ export class ScenePlaybackController {
     const revision = ++this.revision;
     const snapshot = structuredClone(scene);
     const specs: StreamSpec[] = [];
-    if (snapshot.environment) specs.push({ key: 'environment', url: snapshot.environment.url, volume: (snapshot.environmentVolume ?? 70) / 100, loop: true });
+    if (snapshot.environment) specs.push({ key: 'environment', url: snapshot.environment.url, volume: backgroundGain(snapshot.environmentVolume ?? 70), loop: true });
     // Legacy fallback is only for callers that have not adopted the hydrated list.
     const ambiences = snapshot.ambiences ?? (snapshot.weather ? [{ audioId: Number(snapshot.weather.id), volume: snapshot.weatherVolume ?? 45, enabled: true, audio: snapshot.weather }] : []);
     for (const entry of ambiences) {
       if (!entry.enabled) continue;
       if (!entry.audio) throw new Error(`Ambience ${entry.audioId} is unavailable`);
-      specs.push({ key: ambienceKey(entry.audioId), url: entry.audio.url, volume: entry.volume / 100, loop: true });
+      specs.push({ key: ambienceKey(entry.audioId), url: entry.audio.url, volume: backgroundGain(entry.volume), loop: true });
     }
     const applied = await this.mixer.apply(specs, this.mixer.getKeys().filter(sceneKey), duration);
     if (applied && this.revision === revision) {
       // Include live level adjustments made while replacements were loading.
-      for (const entry of ambiences) if (entry.enabled) entry.volume = (this.mixer.getVolume(ambienceKey(entry.audioId)) ?? entry.volume / 100) * 100;
-      if (snapshot.environment) snapshot.environmentVolume = (this.mixer.getVolume('environment') ?? 0.7) * 100;
+      for (const entry of ambiences) if (entry.enabled) entry.volume = backgroundPosition(this.mixer.getVolume(ambienceKey(entry.audioId)) ?? backgroundGain(entry.volume));
+      if (snapshot.environment) snapshot.environmentVolume = backgroundPosition(this.mixer.getVolume('environment') ?? backgroundGain(70));
       snapshot.ambiences = ambiences;
       this.active = snapshot;
     }
@@ -45,12 +48,12 @@ export class ScenePlaybackController {
     const entry = this.active.ambiences?.find(item => item.audioId === audioId);
     if (!entry) return;
     entry.volume = Math.max(0, Math.min(100, volume));
-    if (entry.enabled) this.mixer.setVolume(ambienceKey(audioId), entry.volume / 100);
+    if (entry.enabled) this.mixer.setVolume(ambienceKey(audioId), backgroundGain(entry.volume));
   }
 
   setEnvironmentVolume(sceneId: string, audioId: string, volume: number) {
     if (this.active?.id !== sceneId || this.active.environment?.id !== audioId) return;
     this.active.environmentVolume = Math.max(0, Math.min(100, volume));
-    this.mixer.setVolume('environment', this.active.environmentVolume / 100);
+    this.mixer.setVolume('environment', backgroundGain(this.active.environmentVolume));
   }
 }

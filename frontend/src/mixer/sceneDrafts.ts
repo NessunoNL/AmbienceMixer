@@ -8,6 +8,20 @@ export function scenePayload(scene: Scene): SceneWrite {
     oneshots: scene.oneshots.map(sound => Number(sound.id)) };
 }
 export const sameScene = (a?: Scene, b?: Scene) => !!a && !!b && JSON.stringify(scenePayload(a)) === JSON.stringify(scenePayload(b));
+/** One-shot membership and scene names are edits, not playback transitions. */
+export const sameScenePlayback = (a?: Scene, b?: Scene) => {
+  if (!a || !b || a.id !== b.id) return false;
+  const audio = (scene: Scene) => {
+    const { environment_id, environmentVolume, ambiences } = scenePayload(scene);
+    return { environment_id, environmentVolume, ambiences };
+  };
+  return JSON.stringify(audio(a)) === JSON.stringify(audio(b));
+};
+
+/** Only the active scene's draft controls its trigger strip; other scene edits stay separate. */
+export function activeSceneWithShots(active: Scene | undefined, drafts: Record<string, Scene>) {
+  return active ? { ...active, oneshots: drafts[active.id]?.oneshots ?? active.oneshots } : undefined;
+}
 export interface DraftState { saved: Record<string, Scene>; drafts: Record<string, Scene>; preparedId: string | null }
 
 /** Session drafts survive selection, cancellation and asynchronous save failures. */

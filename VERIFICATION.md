@@ -1,3 +1,9 @@
+## Latest: single-row effects and quiet background levels
+
+Implemented one horizontal one-shot row (144px minimum cards), immediate active-scene one-shot editing without Apply, top-of-screen unsaved markers / Save changes, brief button feedback, and 0–20% environment/ambience output over the full card travel. Saved control positions are preserved; existing background output is reduced fivefold. Music/one-shots remain unchanged. The user confirmed there is no missing-audio problem.
+
+Build and frontend tests pass, including immediate shot editing versus saving/reverting, prepared scene isolation, no Apply for one-shot-only changes, scale/accessibility rendering, engine gain mapping and round-trip precision. Browser automation exposes no browsers in this session; horizontal overflow, visual feedback and physical tablet gestures remain unverified.
+
 ## Tablet-feedback follow-up
 
 Implemented: remove explanatory home copy; direct prepared-scene one-shot selection; responsive active one-shot grid; full queue scrolling inside its card; compact current song; fill-only environment/music volumes. Save/Apply and active-scene one-shot separation are preserved.

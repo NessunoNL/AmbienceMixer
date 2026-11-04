@@ -89,9 +89,21 @@ body:has(.mockup-app){padding:0;overflow:hidden}
 #scene-mood .foot{min-height:0}
 #scene-mood .overlay-body>.scene-panel{overflow:visible;display:block;max-height:none}
 #scene-mood .overlay-body .ambience-grid .volume-card{min-height:70px}
-@media(max-width:600px){#scene-mood .shot-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
 
-#scene-mood{--shot-height:110px;grid-template-rows:44px 48px minmax(0,1fr) var(--shot-height) 44px}
-#scene-mood[data-shot-rows="2"]{--shot-height:164px}
+
+#scene-mood{--shot-height:124px;grid-template-rows:44px 48px minmax(0,1fr) var(--shot-height) 44px}
+
 #scene-mood[data-pending="false"]{grid-template-rows:44px 48px minmax(0,1fr) var(--shot-height)}
 #scene-mood[data-pending="false"]>.foot{display:none}
+
+/* One row forever: cards share spare width, then scroll once below 144px each. */
+#scene-mood .shot-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;align-items:stretch;padding-bottom:5px}
+#scene-mood .shot-grid>button{flex:1 0 144px;min-width:144px;max-width:none;min-height:44px}
+#scene-mood .shot-grid>.muted{align-self:center}
+#scene-mood .scenes{overflow:visible;align-items:stretch;gap:12px}
+#scene-mood .scene-tabs{display:flex;gap:8px;flex:1;min-width:0;overflow-x:auto;overscroll-behavior:contain}
+#scene-mood .scene-tabs>button{flex-shrink:0;max-width:240px}
+#scene-mood .scenes>.save-scene-top{flex-shrink:0;color:var(--on);background:var(--green);font-weight:650}
+#scene-mood .unsaved-dot{color:var(--gold)}
+#scene-mood .unsaved-scene{border-color:var(--gold)}
+#scene-mood button:active{filter:brightness(1.45);box-shadow:inset 0 0 0 2px var(--green)}

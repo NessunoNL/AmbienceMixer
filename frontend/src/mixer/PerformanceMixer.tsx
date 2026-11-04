@@ -6,7 +6,7 @@ import { audioLayer } from './libraryAudio';
 import type { Mixer } from './useMixer';
 import { persist } from './useMixer';
 import type { Scene, SceneAmbience } from '../types';
-import { sameScene } from './sceneDrafts';
+import { sameScene, sameScenePlayback } from './sceneDrafts';
 import { VolumeCard } from './VolumeCard';
 import { Overlay } from './Overlay';
 import { ScenePanel } from './ScenePanel';
@@ -21,7 +21,7 @@ export function PerformanceMixer({ mixer: m }: { mixer: Mixer }) {
   const open = (next: Popup) => { setSearch(''); setPopup(next); };
   const prepared = m.drafts.preparedId ? m.drafts.drafts[m.drafts.preparedId] : undefined;
   const scene = prepared ?? m.active;
-  const pendingScene = !!prepared && !sameScene(prepared, m.active);
+  const pendingScene = !!prepared && !sameScenePlayback(prepared, m.active);
   const pendingMood = !!m.music.preparedMood;
   const pending = pendingScene || pendingMood || m.preparingMood;
   const edit = (update: (draft: Scene) => Scene) => {
@@ -40,7 +40,7 @@ export function PerformanceMixer({ mixer: m }: { mixer: Mixer }) {
     const activeEntry = m.active?.id === scene?.id ? m.active?.ambiences?.find(item => item.audioId === entry.audioId) : undefined;
     const playing = !!activeEntry?.enabled;
     const status = m.active?.id === scene?.id ? `${playing ? 'Playing' : 'Off'}${playing !== entry.enabled ? ` · Pending ${entry.enabled ? 'on' : 'off'}` : ''}` : `Prepared · ${entry.enabled ? 'On' : 'Off'}`;
-    return <VolumeCard key={entry.audioId} name={name} volume={entry.volume} off={!entry.enabled} status={status} onChange={volume => {
+    return <VolumeCard maxVolume={20} key={entry.audioId} name={name} volume={entry.volume} off={!entry.enabled} status={status} onChange={volume => {
       edit(draft => ({ ...draft, ambiences: draft.ambiences?.map(item => item.audioId === entry.audioId ? { ...item, volume } : item) }));
       if (scene) m.liveVolume(scene, entry.audioId, volume);
     }}><button role="switch" aria-label={`Enable ${name}`} aria-checked={entry.enabled} disabled={!scene || !m.drafts.drafts[scene.id]} onClick={() => edit(draft => ({ ...draft, ambiences: draft.ambiences?.map(item => item.audioId === entry.audioId ? { ...item, enabled: !item.enabled } : item) }))}>{entry.enabled ? 'On' : 'Off'}</button><button aria-label={`Remove ${name}`} onClick={() => edit(draft => ({ ...draft, ambiences: draft.ambiences?.filter(item => item.audioId !== entry.audioId) }))}><X size={16} /></button></VolumeCard>;
@@ -54,17 +54,23 @@ export function PerformanceMixer({ mixer: m }: { mixer: Mixer }) {
   };
   const dirty = !!scene && !sameScene(scene, m.drafts.saved[scene.id]);
   const sceneChoices = Object.values(m.drafts.drafts);
-  return <div id="scene-mood" className="mixer-app mockup-app" data-layout="tiles" data-sliders="false" data-shot-rows={(m.active?.oneshots.length ?? 0) > 8 ? 2 : 1} data-pending={!!pending}>
+  return <div id="scene-mood" className="mixer-app mockup-app" data-layout="tiles" data-sliders="false" data-pending={!!pending} onClickCapture={event => {
+    const button = (event.target as Element).closest('button');
+    if (button && !button.disabled && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      button.getAnimations().forEach(animation => animation.cancel());
+      button.animate([{ filter: 'brightness(1.65)', boxShadow: 'inset 0 0 0 2px #bed49b' }, { filter: 'brightness(1)', boxShadow: 'inset 0 0 0 0px transparent' }], { duration: 420, easing: 'ease-out' });
+    }
+  }}>
     <header className="row"><div className="brand"><AudioLines aria-hidden="true" />AmbienceMixer</div><div className="group"><button onClick={() => open('settings')} aria-label="Open settings"><Settings /></button><button aria-pressed={m.muted} onClick={m.toggleMute}><VolumeX /><span>{m.muted ? 'Unmute all' : 'Mute all'}</span></button></div></header>
-    <nav className="scenes" aria-label="Saved scenes">{sceneChoices.slice(0, 4).map(item => <button key={item.id} aria-pressed={scene?.id === item.id} onClick={() => m.selectScene(item.id)}>{item.label}</button>)}{sceneChoices.length > 4 && <button onClick={() => open('scenes')}>All scenes</button>}<button className="new" onClick={() => { m.createScene(); open('editor'); }}><Plus />New scene</button></nav>
+    <nav className="scenes" aria-label="Saved scenes"><div className="scene-tabs">{sceneChoices.slice(0, 4).map(item => { const unsaved = !sameScene(item, m.drafts.saved[item.id]); return <button key={item.id} aria-label={`${item.label}${unsaved ? ' (unsaved changes)' : ''}`} className={unsaved ? 'unsaved-scene' : ''} aria-pressed={scene?.id === item.id} onClick={() => m.selectScene(item.id)}>{item.label}{unsaved && <span className="unsaved-dot" aria-hidden="true"> ●</span>}</button>; })}{sceneChoices.length > 4 && <button onClick={() => open('scenes')}>All scenes</button>}<button className="new" onClick={() => { m.createScene(); open('editor'); }}><Plus />New scene</button></div>{dirty && <button className="primary save-scene-top" disabled={m.saving} onClick={() => { if (!m.drafts.preparedId && scene) m.selectScene(scene.id); void m.run(m.save); }}>{m.saving ? 'Saving…' : 'Save changes'}</button>}</nav>
     <main className="columns">
       <section className="panel scene-panel" aria-label="Scene mixer">
         <div className="row scene-top"><div><div className="eyebrow">Scene</div><h2>{scene?.label ?? 'Choose a scene'}</h2></div><button onClick={editScene} disabled={m.loading}>Edit scene</button></div>
-        <div className="environment-volume"><VolumeCard name={scene?.environment?.name ?? 'Environment'} status="Environment" volume={scene?.environmentVolume ?? 70} onChange={volume => { if (!scene?.environment) return; edit(draft => ({ ...draft, environmentVolume: volume })); m.liveVolume(scene, 'environment', volume); }} /></div>
+        <div className="environment-volume"><VolumeCard maxVolume={20} name={scene?.environment?.name ?? 'Environment'} status="Environment" volume={scene?.environmentVolume ?? 70} onChange={volume => { if (!scene?.environment) return; edit(draft => ({ ...draft, environmentVolume: volume })); m.liveVolume(scene, 'environment', volume); }} /></div>
         <div className="row subheading"><h3>Ambiences <span className="muted">{scene?.ambiences?.length ?? 0} layers</span></h3><div className="group">{(scene?.ambiences?.length ?? 0) > 4 && <button onClick={() => open('ambiences')}>All sounds</button>}<button disabled={!scene} onClick={() => setPicking('weather')}><Plus />Add sounds</button></div></div>
         <div className="ambiences">{scene?.ambiences?.slice(0, 4).map(ambienceCard)}{!scene?.ambiences?.length && <p className="muted">No ambiences</p>}</div>
 
-        <div className="row save-bar"><span className="muted" role="status">{pendingScene ? `Prepared · Active: ${m.active?.label ?? 'none'}` : m.active ? 'Active scene' : 'Prepared'}</span><div className="group">{dirty && <button disabled={m.saving} onClick={() => { if (scene) m.store.revert(scene.id); }}>Revert</button>}<button disabled={!dirty || m.saving} onClick={() => void m.run(m.save)}>{m.saving ? 'Saving…' : dirty ? 'Save scene' : 'Saved'}</button>{pendingScene && <button className="primary" onClick={() => void m.run(m.applyScene)}>Apply scene</button>}</div></div>
+        <div className="row save-bar"><span className="muted" role="status">{pendingScene ? `Prepared · Active: ${m.active?.label ?? 'none'}` : m.active ? 'Active scene' : 'Prepared'}</span><div className="group">{dirty && <button disabled={m.saving} onClick={() => { if (scene) m.store.revert(scene.id); }}>Revert</button>}{pendingScene && <button className="primary" onClick={() => void m.run(m.applyScene)}>Apply scene</button>}</div></div>
       </section>
       <section className="panel music-panel" aria-label="Music mixer">
         <div className="row"><div><div className="eyebrow">Music</div><h2>Set the mood</h2></div><Music2 /></div>
@@ -75,7 +81,7 @@ export function PerformanceMixer({ mixer: m }: { mixer: Mixer }) {
         <div className="music-volume"><VolumeCard name="Music" volume={Math.round(m.music.volume * 100)} onChange={volume => { m.engine?.music.setVolume(volume / 100); persist('music-volume', volume); }} />{pendingMood && <button className="primary" onClick={() => void m.run(m.applyMood)}>Apply mood</button>}</div>
       </section>
     </main>
-    <section className="shots" aria-label="Active scene one-shots"><div className="row"><div><h3>One-shots <span className="muted">· {m.active?.label ?? 'No active scene'}</span></h3></div><div className="group"><button disabled={!scene} onClick={() => setPicking('oneshots')}>Choose one-shots</button><button onClick={() => open('shots')}>Volume</button></div></div><div className="shot-grid" style={{ gridTemplateColumns: `repeat(${Math.min(m.active?.oneshots.length || 1, 8)}, minmax(0, 1fr))` }}>{m.active?.oneshots.map(shot)}{!m.active?.oneshots.length && <p className="muted">No active one-shots</p>}</div></section>
+    <section className="shots" aria-label="Active scene one-shots"><div className="row"><div><h3>One-shots <span className="muted">· {m.active?.label ?? 'No active scene'}</span></h3></div><div className="group"><button disabled={!scene} onClick={() => setPicking('oneshots')}>Choose one-shots</button><button onClick={() => open('shots')}>Volume</button></div></div><div className="shot-grid" role="region" aria-label="One-shot triggers" tabIndex={0}>{m.active?.oneshots.map(shot)}{!m.active?.oneshots.length && <p className="muted">No active one-shots</p>}</div></section>
     <footer className="foot"><span role="status">{m.applying || m.music.transitioning ? 'Applying…' : pending ? 'Prepared' : ''}</span><div className="group">{pending && <button onClick={() => { m.cancelScene(); m.cancelMood(); }}>Cancel changes</button>}{pendingScene && pendingMood && <button className="primary" disabled={m.preparingMood} onClick={() => void m.run(applyAll)}>Apply all</button>}</div></footer>
     {picking && scene && <SoundPicker title={picking === 'weather' ? 'Add ambiences' : `One-shots · ${scene.label}`} files={m.library[picking]} categories={m.categories} selected={picking === 'weather' ? scene.ambiences?.map(item => item.audioId) ?? [] : scene.oneshots.map(item => Number(item.id))} onToggle={file => edit(draft => picking === 'weather' ? ({ ...draft, ambiences: draft.ambiences?.some(item => item.audioId === file.id) ? draft.ambiences.filter(item => item.audioId !== file.id) : [...(draft.ambiences ?? []), { audioId: file.id, volume: 35, enabled: true, audio: audioLayer(file) }] }) : ({ ...draft, oneshots: draft.oneshots.some(item => item.id === String(file.id)) ? draft.oneshots.filter(item => item.id !== String(file.id)) : [...draft.oneshots, { id: String(file.id), name: file.name, url: api.getAudioStreamUrl(file.id), icon: 'Zap' }] }))} onClose={() => setPicking(null)} />}
     {(m.error || m.music.error) && <div className="performance-error" role="alert"><span>{m.error || m.music.error}</span><button onClick={() => { setErrorDetail(m.error || m.music.error || ''); m.setError(''); open('settings'); }}>Details</button></div>}

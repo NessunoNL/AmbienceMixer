@@ -147,9 +147,9 @@ test('off volume edits do not play, while re-enable restores saved volume', asyn
   assert.equal(engine.scenes.getActiveScene().ambiences[0].volume, 80);
   const on = engine.scenes.getActiveScene(); on.ambiences[0].enabled = true;
   await engine.scenes.applyScene(on, 0);
-  assert.equal(mixer.channels.get('ambience:1').volume, 0.8);
+  assert.equal(mixer.channels.get('ambience:1').volume, 0.16);
   engine.scenes.setAmbienceVolume('different-draft', 1, 10);
-  assert.equal(mixer.channels.get('ambience:1').volume, 0.8);
+  assert.equal(mixer.channels.get('ambience:1').volume, 0.16);
 });
 
 test('master mute covers streams, tails and one-shots without changing levels', async t => {
@@ -259,7 +259,7 @@ test('live volume changes during a prepared scene survive commit and appear in a
   engine.scenes.setAmbienceVolume('mix', 1, 20);
   Audio.instances.find(audio => audio.src === 'sound-2').release();
   await pending;
-  assert.equal(mixer.getVolume('ambience:1'), 0.2);
+  assert.equal(mixer.getVolume('ambience:1'), 0.04);
   assert.equal(engine.scenes.getActiveScene().ambiences[0].volume, 20);
 });
 
@@ -457,4 +457,27 @@ test('disposing during one-shot loading cannot start late audio', async t => {
   release({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
   await rejected;
   assert.equal(context.sources.length, 0);
+});
+
+test('scene background control positions map to 0–20% gain on Apply and live edits', async t => {
+  const { engine, mixer } = await engineFixture(t);
+  const prepared = scene('quiet', [ambience(1, true, 100)], { id: '99', name: 'Forest', url: '/forest', volume: 1 });
+  prepared.environmentVolume = 70;
+  await engine.scenes.applyScene(prepared, 0);
+  assert.equal(mixer.getVolume('environment'), .14);
+  assert.equal(mixer.getVolume('ambience:1'), .2);
+  assert.equal(engine.scenes.getActiveScene().environmentVolume, 70);
+  engine.scenes.setEnvironmentVolume('quiet', '99', 100);
+  engine.scenes.setAmbienceVolume('quiet', 1, 50);
+  assert.equal(mixer.getVolume('environment'), .2);
+  assert.equal(mixer.getVolume('ambience:1'), .1);
+  assert.equal(engine.scenes.getActiveScene().ambiences[0].volume, 50);
+});
+
+test('background scale round-trips saved positions without phantom pending changes', async t => {
+  const { engine } = await engineFixture(t);
+  for (const position of [1, 7, 29, 57, 99]) {
+    await engine.scenes.applyScene(scene('mix', [ambience(1, true, position)]), 0);
+    assert.equal(engine.scenes.getActiveScene().ambiences[0].volume, position);
+  }
 });

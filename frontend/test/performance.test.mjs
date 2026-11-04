@@ -27,3 +27,18 @@ test('preparing another scene keeps active one-shots and current music on the ho
   assert.match(html, /Cave/); assert.match(html, /Active: Forest/); assert.match(html, /Playing song/); assert.match(html, /Effect 0/);
   assert.doesNotMatch(html, /Prepared-only shot/); assert.match(html, /Apply.*scene/);
 });
+
+test('one-shot-only edits show a save action and unsaved scene marker without Apply', () => {
+  const mixer = fixture();
+  mixer.drafts.drafts = { forest: { ...scene, oneshots: [] } };
+  const html = render(mixer);
+  assert.match(html, /Save changes/);
+  assert.match(html, /Forest \(unsaved changes\)/);
+  assert.doesNotMatch(html, />Apply scene</);
+});
+test('background fill keeps its full travel while exposing a maximum of twenty percent', () => {
+  const html = render(fixture());
+  assert.match(html, /aria-label="Forest bed volume"[^>]*aria-valuemax="20"[^>]*aria-valuenow="10"/);
+  assert.match(html, /aria-label="Ambience 0 volume"[^>]*aria-valuemax="20"[^>]*aria-valuenow="8"/);
+  assert.match(html, /aria-label="Music volume"[^>]*aria-valuemax="100"/);
+});

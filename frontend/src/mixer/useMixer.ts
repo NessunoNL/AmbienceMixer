@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import type { AudioLibrary, SoundCategory } from '../services/api';
 import type { MusicTag, Scene } from '../types';
 import type { MusicQueueSnapshot } from '../audio/musicQueue';
-import { SceneDrafts, scenePayload } from './sceneDrafts';
+import { SceneDrafts, scenePayload, activeSceneWithShots } from './sceneDrafts';
 
 const emptyLibrary: AudioLibrary = { environment: [], weather: [], music: [], oneshots: [] };
 const emptyMusic: MusicQueueSnapshot = { mood: null, preparedMood: null, current: null, upcoming: [], paused: false, volume: .5, transitioning: false, error: null, playedCount: 0, total: 0 };
@@ -103,7 +103,7 @@ export function useMixer() {
     else if (typeof id === 'number') engine?.scenes.setAmbienceVolume(scene.id, id, value);
     setActive(engine?.scenes.getActiveScene());
   };
-  return { store, drafts, engine, library, categories, tags, music, active, error, setError, loading, saving, applying, ready, muted,
+  return { store, drafts, engine, library, categories, tags, music, active: activeSceneWithShots(active, drafts.drafts), error, setError, loading, saving, applying, ready, muted,
     shotVolume, setShotVolume, sceneDuration, setSceneDuration, musicDuration, setMusicDuration, preparingMood, run, unlock,
     initialize, refreshLibrary, applyScene, cancelScene, selectScene, createScene, save, remove, prepareMood, cancelMood, applyMood, liveVolume,
     toggleMute: () => { engine?.setMuted(!muted); setMuted(!muted); } };

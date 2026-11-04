@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 const directory = mkdtempSync(join(tmpdir(), 'ambience-drafts-'));
 await build({ entryPoints: [join(dirname(dirname(fileURLToPath(import.meta.url))), 'src/mixer/sceneDrafts.ts')], bundle: true, platform: 'node', format: 'esm', outfile: join(directory, 'drafts.mjs') });
-const { SceneDrafts, scenePayload, sameScene } = await import(pathToFileURL(join(directory, 'drafts.mjs')));
+const { SceneDrafts, scenePayload, sameScene, sameScenePlayback, activeSceneWithShots } = await import(pathToFileURL(join(directory, 'drafts.mjs')));
 after(() => rmSync(directory, { recursive: true, force: true }));
 const scene = id => ({ id, label: id, icon: 'Trees', environment: { id: '1', name: 'Forest', url: '/1', volume: .6 }, environmentVolume: 60,
   ambiences: [{ audioId: 2, volume: 37, enabled: false, audio: { id: '2', name: 'Rain', url: '/2', volume: .37 } }],
@@ -48,4 +48,23 @@ test('new and deleted drafts do not mutate independently applied snapshots', () 
   assert.equal(store.getSnapshot().saved[id], undefined);
   store.remove('a'); assert.equal(active.oneshots[0].id, '4');
   store.remove(id); assert.equal(store.getSnapshot().preparedId, null);
+});
+
+test('one-shot edits update only the active strip immediately, remain unsaved, and never prepare audio', () => {
+  const store = new SceneDrafts(); store.load([scene('a'), scene('b')]);
+  const active = structuredClone(store.getSnapshot().drafts.a);
+  store.edit('a', draft => ({ ...draft, oneshots: [{ id: '8', name: 'Bell', url: '/8', icon: 'Zap' }] }));
+  let state = store.getSnapshot();
+  assert.equal(sameScene(state.saved.a, state.drafts.a), false);
+  assert.equal(sameScenePlayback(state.drafts.a, active), true);
+  assert.equal(activeSceneWithShots(active, state.drafts).oneshots[0].id, '8');
+  assert.equal(active.oneshots[0].id, '4');
+  store.edit('b', draft => ({ ...draft, oneshots: [] }));
+  assert.equal(activeSceneWithShots(active, store.getSnapshot().drafts).oneshots[0].id, '8');
+  store.revert('a');
+  assert.equal(activeSceneWithShots(active, store.getSnapshot().drafts).oneshots[0].id, '4');
+  store.edit('a', draft => ({ ...draft, environmentVolume: 20 }));
+  state = store.getSnapshot();
+  assert.equal(sameScenePlayback(state.drafts.a, active), false);
+  assert.equal(sameScenePlayback(state.drafts.b, active), false);
 });

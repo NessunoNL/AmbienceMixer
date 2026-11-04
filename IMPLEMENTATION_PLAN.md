@@ -200,3 +200,12 @@ The home fits 1280×720 and 800×1280 desktop-emulated tablet viewports without 
 ### Latest tablet feedback follow-up
 
 Replaced visible environment/music sliders with fill controls, removed repetitive home text, added direct prepared-scene one-shot selection, responsive active shot cards, and a full internally scrolling music queue with compact now-playing. One-shots now use bounded decoded Web Audio playback/cache through master mute. See VERIFICATION.md for checks and the still-unverified physical tablet timeout/layout. Missing sounds are not present in the mounted 63-file share; awaiting an example/location. Background volume balance is a separate decision; existing levels remain preserved.
+
+### Latest user-approved interaction changes
+
+- One-shots never add another row; 144px minimum cards overflow horizontally.
+- Edits to the active scene’s one-shots are immediate and require Save for persistence, not Apply. Another prepared scene retains separate shot selections until applied.
+- Scene chips mark unsaved edits; Save changes is adjacent to the chips.
+- Buttons briefly brighten on activation with reduced-motion support.
+- Background card travel maps to 0–20% gain (stored positions remain 0–100). Existing saved backgrounds play five times quieter; music/one-shots keep their full scale.
+- Missing audio concern resolved by the user. Browser/device verification of this latest layout remains pending because no browser surface is available.
