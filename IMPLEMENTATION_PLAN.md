@@ -209,3 +209,7 @@ Replaced visible environment/music sliders with fill controls, removed repetitiv
 - Buttons briefly brighten on activation with reduced-motion support.
 - Background card travel maps to 0–20% gain (stored positions remain 0–100). Existing saved backgrounds play five times quieter; music/one-shots keep their full scale.
 - Missing audio concern resolved by the user. Browser/device verification of this latest layout remains pending because no browser surface is available.
+
+### 2026-11-05: pending indicators and transport fades
+
+Implemented orange pending-Apply dots, reserved action/footer space and music pause/resume using the selected music fade duration. Build/frontend tests pass. Local browser measurements confirm unchanged panel heights across preparation/Apply/cancel at landscape and portrait tablet sizes; real local music pauses after its fade and resumes at the retained position. See VERIFICATION.md. Publication and physical-tablet listening remain pending.

@@ -175,6 +175,7 @@ test('master mute covers streams, tails and one-shots without changing levels', 
 test('pause waits for fade, resume preserves position, rapid commands do not pause later', async t => {
   const { engine, mixer, context } = await engineFixture(t);
   await engine.loadLayer('music', 'song', 0.4, 0);
+  engine.music.setTransitionDuration(.2);
   const audio = mixer.getAudio('music'); audio.currentTime = 10;
   await engine.setPaused('music', true);
   assert.equal(audio.paused, false);
@@ -480,4 +481,24 @@ test('background scale round-trips saved positions without phantom pending chang
     await engine.scenes.applyScene(scene('mix', [ambience(1, true, position)]), 0);
     assert.equal(engine.scenes.getActiveScene().ambiences[0].volume, position);
   }
+});
+
+test('music pause and resume use the selected fade duration and keep track position', async t => {
+  const { engine, mixer, context } = await engineFixture(t);
+  await engine.loadLayer('music', 'song', .4, 0);
+  const audio = mixer.getAudio('music'); audio.currentTime = 12;
+  engine.music.setTransitionDuration(.04);
+  await engine.music.setPaused(true);
+  const transport = mixer.channels.get('music').transportNode.gain;
+  assert.equal(transport.events.filter(event => event[0] === 'curve').at(-1)[3], .04);
+  assert.equal(audio.paused, false);
+  await wait(60); context.currentTime += .04;
+  assert.equal(audio.paused, true);
+  await engine.music.setPaused(false);
+  assert.equal(transport.events.filter(event => event[0] === 'curve').at(-1)[3], .04);
+  assert.equal(audio.currentTime, 12);
+  assert.equal(mixer.getVolume('music'), .4);
+  await engine.music.setPaused(true); await engine.music.setPaused(false);
+  await wait(60);
+  assert.equal(audio.paused, false);
 });

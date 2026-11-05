@@ -42,3 +42,17 @@ test('background fill keeps its full travel while exposing a maximum of twenty p
   assert.match(html, /aria-label="Ambience 0 volume"[^>]*aria-valuemax="20"[^>]*aria-valuenow="8"/);
   assert.match(html, /aria-label="Music volume"[^>]*aria-valuemax="100"/);
 });
+
+test('pending scene and mood have accessible Apply indicators', () => {
+  const mixer = fixture();
+  mixer.drafts.drafts = { forest: { ...scene, environmentVolume: 30 } };
+  mixer.music.preparedMood = { id: 'battle', name: 'Battle', tracks: [] };
+  const html = render(mixer);
+  assert.match(html, /aria-label="Scene changes need Apply"/);
+  assert.match(html, /aria-label="Mood changes need Apply"/);
+  assert.match(html, /Changes need Apply/);
+  const clean = render(fixture());
+  assert.doesNotMatch(clean, /aria-label="Scene changes need Apply"/);
+  assert.match(clean, /class="apply-slot"/);
+  assert.match(clean, /class="foot"/);
+});

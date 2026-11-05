@@ -69,7 +69,7 @@ export class MusicQueueController {
   }
   async setPaused(paused: boolean) {
     this.paused = paused; this.emit();
-    try { await this.mixer.setPaused('music', paused); }
+    try { await this.mixer.setPaused('music', paused, this.duration); }
     catch (error) { this.paused = true; this.error = String(error); this.emit(); throw error; }
   }
 

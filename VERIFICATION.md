@@ -1,3 +1,11 @@
+## Latest: pending Apply indicators and smooth transport — 2026-11-05
+
+Orange dots identify pending scene/mood changes. Apply controls reserve their space, including the footer, so showing/hiding them does not resize the mixer panels. Music pause/resume uses the selected music transition duration and keeps the current track position.
+
+`./scripts/check` and all frontend tests pass. Added coverage for pending indicators, reserved markup, selected transport fade duration, retained track position and rapid pause/resume cancellation.
+
+Local browser checks with real audio: at 1280×720 both panels remained 408px high before/after Apply scene and mood preparation; at 800×1280 both remained 477px high before/after scene preparation and cancellation. One-shot strip stayed 124px high. Pending indicators appeared and cleared correctly. Music remained playing during the fade-out, then paused at 3.27s and resumed from that position; environment and ambience continued. Portrait screenshot inspected. This verifies media state, not audible smoothness. Physical tablet listening/touch and long-session checks remain pending. These changes have not yet been published.
+
 ## Latest: single-row effects and quiet background levels
 
 Implemented one horizontal one-shot row (144px minimum cards), immediate active-scene one-shot editing without Apply, top-of-screen unsaved markers / Save changes, brief button feedback, and 0–20% environment/ambience output over the full card travel. Saved control positions are preserved; existing background output is reduced fivefold. Music/one-shots remain unchanged. The user confirmed there is no missing-audio problem.

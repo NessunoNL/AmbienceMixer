@@ -282,25 +282,26 @@ export class StreamMixer {
   }
   setMuted(muted: boolean) { this.masterGain.fade(muted ? 0 : 1, TRANSITIONS.transport); }
 
-  async setPaused(key: string, paused: boolean) {
+  async setPaused(key: string, paused: boolean, duration: number = TRANSITIONS.transport) {
+    const fade = seconds(duration);
     const channel = this.channel(key);
     const revision = ++channel.transportRevision;
     clearTimeout(channel.pauseTimer);
     channel.paused = paused;
     if (paused) {
-      channel.transport.fade(0, channel.voices.size ? TRANSITIONS.transport : 0);
+      channel.transport.fade(0, channel.voices.size ? fade : 0);
       channel.pauseTimer = setTimeout(() => {
         if (channel.paused && channel.transportRevision === revision) for (const voice of channel.voices) voice.audio.pause();
-      }, TRANSITIONS.transport * 1000);
+      }, fade * 1000);
     } else {
       try {
         await Promise.all([...channel.voices].map(voice => voice.audio.play()));
-        if (channel.transportRevision === revision) channel.transport.fade(1, TRANSITIONS.transport);
+        if (channel.transportRevision === revision) channel.transport.fade(1, fade);
       } catch (error) {
         if (channel.transportRevision === revision) {
           channel.paused = true;
           for (const voice of channel.voices) voice.audio.pause();
-          channel.transport.fade(0, TRANSITIONS.transport);
+          channel.transport.fade(0, fade);
         }
         throw error;
       }

@@ -93,8 +93,8 @@ body:has(.mockup-app){padding:0;overflow:hidden}
 
 #scene-mood{--shot-height:124px;grid-template-rows:44px 48px minmax(0,1fr) var(--shot-height) 44px}
 
-#scene-mood[data-pending="false"]{grid-template-rows:44px 48px minmax(0,1fr) var(--shot-height)}
-#scene-mood[data-pending="false"]>.foot{display:none}
+
+#scene-mood[data-pending="false"]>.foot{visibility:hidden}
 
 /* One row forever: cards share spare width, then scroll once below 144px each. */
 #scene-mood .shot-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;align-items:stretch;padding-bottom:5px}
@@ -107,3 +107,17 @@ body:has(.mockup-app){padding:0;overflow:hidden}
 #scene-mood .unsaved-dot{color:var(--gold)}
 #scene-mood .unsaved-scene{border-color:var(--gold)}
 #scene-mood button:active{filter:brightness(1.45);box-shadow:inset 0 0 0 2px var(--green)}
+
+/* Prepared controls occupy the same space whether or not there is a pending change. */
+#scene-mood .pending-dot{color:#f3a343;font-size:13px;line-height:1;display:inline-block;vertical-align:middle}
+#scene-mood .eyebrow{height:17px;white-space:nowrap}
+#scene-mood .save-bar{height:60px;min-height:60px;flex-wrap:nowrap;overflow:hidden}
+#scene-mood .save-bar>span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#scene-mood .save-bar>.group{min-height:44px;flex-shrink:0;flex-wrap:nowrap}
+#scene-mood .music-volume{height:46px;min-height:46px;flex-shrink:0}
+#scene-mood .apply-slot{width:134px;flex:0 0 134px;display:flex}
+#scene-mood .apply-slot>button{width:100%;white-space:nowrap;padding:6px 10px}
+#scene-mood .now>.row:first-child{flex-wrap:nowrap;height:17px;min-width:0}
+#scene-mood .now>.row:first-child>.muted{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#scene-mood .now>.row:last-child{height:44px}
+#scene-mood .foot{height:44px;min-height:44px}
